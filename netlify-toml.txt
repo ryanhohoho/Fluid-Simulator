@@ -1,6 +1,8 @@
 [build]
   publish = "."
-  command = "npm run build"
+  command = ""
 
-[build.environment]
-  NODE_VERSION = "16"
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
