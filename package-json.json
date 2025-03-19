@@ -1,0 +1,16 @@
+{
+  "name": "fluid-simulation",
+  "version": "1.0.0",
+  "description": "Interactive fluid simulation using Smoothed Particle Hydrodynamics",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "dev": "npx serve"
+  },
+  "dependencies": {
+    "three": "^0.134.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}
