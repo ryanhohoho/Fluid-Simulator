@@ -17,6 +17,9 @@
             --card-bg: rgba(23, 23, 23, 0.8);
             --slider-track: #333;
             --slider-thumb: #fff;
+            --button-primary: #0070f3;
+            --button-hover: #0060d3;
+            --button-active: #0050c3;
         }
 
         * {
@@ -168,6 +171,12 @@
             margin-bottom: 0;
         }
 
+        .control-divider {
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.1);
+            margin: 1.5rem 0;
+        }
+
         .control-title {
             font-size: 0.85rem;
             font-weight: 600;
@@ -220,6 +229,12 @@
 
         .control-group button:hover {
             filter: brightness(1.1);
+            transform: translateY(-2px);
+        }
+
+        .control-group button:active {
+            filter: brightness(0.9);
+            transform: translateY(0);
         }
 
         .grid-background {
@@ -330,7 +345,84 @@
             font-size: 0.7rem;
             opacity: 0.6;
         }
-        
+
+        /* Object upload styling */
+        .model-upload {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+        }
+
+        .file-input-container {
+            position: relative;
+            flex: 1;
+        }
+
+        .file-input-container input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-input-container .file-input-label {
+            display: block;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-input-container input[type="file"]:hover + .file-input-label {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .load-model-btn {
+            padding: 0.5rem 0.75rem;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .load-model-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .load-model-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Control button grid */
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .button-grid button {
+            margin-top: 0;
+        }
+
+        /* Button icons */
+        .button-icon {
+            margin-right: 0.5rem;
+            font-size: 1rem;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .info-panel {
@@ -353,13 +445,6 @@
     </style>
 </head>
 <body>
-    <button id="pause-button" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">Pause</button>
-
-    <div style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.5); padding: 10px;">
-        <input type="file" id="obj-file" accept=".obj">
-        <button id="load-model">Load Model</button>
-    </div>
-    
     <div class="loading">
         <div class="spinner"></div>
         <div class="loading-text">Initializing fluid simulation...</div>
@@ -465,13 +550,36 @@
                     <option value="smooth">Smooth Surface</option>
                 </select>
             </div>
+
+            <div class="control-divider"></div>
             
             <div class="control-group">
-                <button id="reset-sim">Reset Simulation</button>
+                <div class="control-title">
+                    <span>3D Model Import</span>
+                </div>
+                <div class="model-upload">
+                    <div class="file-input-container">
+                        <input type="file" id="obj-file" accept=".obj">
+                        <label for="obj-file" class="file-input-label" id="file-name-display">Choose File</label>
+                    </div>
+                    <button id="load-model" class="load-model-btn" disabled>Load</button>
+                </div>
             </div>
-            
+
+            <div class="control-divider"></div>
+
             <div class="control-group">
-                <button id="drop-particles">Drop Particles</button>
+                <div class="button-grid">
+                    <button id="reset-sim">
+                        <span class="button-icon">↺</span>Reset
+                    </button>
+                    <button id="pause-button">
+                        <span class="button-icon" id="pause-icon">⏸️</span><span id="pause-text">Pause</span>
+                    </button>
+                    <button id="drop-particles" style="grid-column: span 2;">
+                        <span class="button-icon">↓</span>Drop Particles
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -481,6 +589,7 @@
     </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/OBJLoader.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
     <script>
         // Main simulation parameters
@@ -546,12 +655,13 @@
         let spatialHash = {};
         let particleColor = new THREE.Color(0xff3d00); // Fire color initially
         let particleMaterial, particleSystem;
+        let isSimulationPaused = false;
         let lastTime = 0;
         let frameCount = 0;
         let fpsUpdateInterval = 1000; // Update FPS every second
         let fpsLastUpdate = 0;
-        let objLoader;
-        let isSimulationPaused = false;
+        let loadedModel = null;
+        let modelMeshes = [];
         
         // Initialize the scene
         function init() {
@@ -590,7 +700,7 @@
             // Clock for time-based animations
             clock = new THREE.Clock();
             
-                    // Lighting
+            // Lighting
             const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
             scene.add(ambientLight);
             
@@ -625,10 +735,13 @@
             container.position.set(0, 0, 0);
             scene.add(container);
             
+            // Initialize OBJ loader
+            initOBJLoader();
+            
             // Initialize the particle system
             initParticles(true);
             
-            // Pause Sim
+            // Pause button event listener
             document.getElementById('pause-button').addEventListener('click', toggleSimulationPause);
 
             // UI Event listeners
@@ -681,41 +794,29 @@
             document.getElementById('reset-sim').addEventListener('click', resetSimulation);
             document.getElementById('drop-particles').addEventListener('click', dropParticleBlock);
             
+            // File input event listener
+            const fileInput = document.getElementById('obj-file');
+            fileInput.addEventListener('change', function(e) {
+                const fileName = e.target.files[0] ? e.target.files[0].name : 'Choose File';
+                document.getElementById('file-name-display').textContent = fileName;
+                
+                // Enable or disable the load button
+                document.getElementById('load-model').disabled = !e.target.files[0];
+            });
+            
+            // Load model button event listener
+            document.getElementById('load-model').addEventListener('click', function() {
+                const fileInput = document.getElementById('obj-file');
+                if (fileInput.files.length === 0) return;
+                
+                loadOBJModel(fileInput.files[0]);
+            });
+            
             // Preset buttons
             document.getElementById('preset-water').addEventListener('click', () => applyPreset('water'));
             document.getElementById('preset-honey').addEventListener('click', () => applyPreset('honey'));
             document.getElementById('preset-fire').addEventListener('click', () => applyPreset('fire'));
             document.getElementById('preset-splash').addEventListener('click', () => applyPreset('splash'));
-
-            // Object loading button
-            document.getElementById('load-model').addEventListener('click', function() {
-                const fileInput = document.getElementById('obj-file');
-                if (fileInput.files.length === 0) return;
-                
-                const file = fileInput.files[0];
-                const fileURL = URL.createObjectURL(file);
-                
-                objLoader.load(fileURL, function(object) {
-                    // Scale and position the model
-                    object.scale.set(0.5, 0.5, 0.5);
-                    object.position.set(0, 0, 0);
-                    
-                    // Add basic material
-                    object.traverse(function(child) {
-                        if (child.isMesh) {
-                            child.material = new THREE.MeshPhongMaterial({
-                                color: 0xcccccc
-                            });
-                        }
-                    });
-                    
-                    // Add to scene
-                    scene.add(object);
-                    
-                    // Release URL
-                    URL.revokeObjectURL(fileURL);
-                });
-            });
             
             // Handle window resize
             window.addEventListener('resize', onWindowResize);
@@ -723,7 +824,7 @@
             // Handle key events
             window.addEventListener('keydown', (event) => {
                 if (event.key === ' ') {
-                    isSimulationPaused = !isSimulationPaused;
+                    toggleSimulationPause();
                 }
                 if (event.key === 'r') {
                     resetSimulation();
@@ -743,6 +844,80 @@
             
             // Start animation loop
             animate();
+        }
+
+        // Initialize OBJ loader
+        function initOBJLoader() {
+            if (typeof THREE.OBJLoader === 'undefined') {
+                console.error('THREE.OBJLoader not available. Make sure you have included the script.');
+                return;
+            }
+        }
+        
+        // Load OBJ Model
+        function loadOBJModel(file) {
+            // Remove existing model if any
+            if (loadedModel) {
+                scene.remove(loadedModel);
+                loadedModel = null;
+                modelMeshes = [];
+            }
+            
+            // Create a file URL
+            const fileURL = URL.createObjectURL(file);
+            
+            // Create OBJ loader
+            const objLoader = new THREE.OBJLoader();
+            
+            // Start loading
+            objLoader.load(
+                fileURL,
+                // onLoad callback
+                function(object) {
+                    // Scale and position the model
+                    object.scale.set(2, 2, 2);
+                    object.position.set(0, 0, 0);
+                    
+                    // Apply materials and store meshes
+                    object.traverse(function(child) {
+                        if (child instanceof THREE.Mesh) {
+                            // Apply a standard material
+                            child.material = new THREE.MeshPhongMaterial({
+                                color: 0xcccccc,
+                                transparent: true,
+                                opacity: 0.7,
+                                side: THREE.DoubleSide
+                            });
+                            
+                            // Store meshes for collision detection
+                            modelMeshes.push({
+                                mesh: child,
+                                geometry: child.geometry,
+                                // Create bounding box for collision detection
+                                boundingBox: new THREE.Box3().setFromObject(child)
+                            });
+                        }
+                    });
+                    
+                    // Add to scene
+                    scene.add(object);
+                    loadedModel = object;
+                    
+                    // Release URL
+                    URL.revokeObjectURL(fileURL);
+                    
+                    console.log('Model loaded successfully', object);
+                },
+                // onProgress callback
+                function(xhr) {
+                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                // onError callback
+                function(error) {
+                    console.error('Error loading model:', error);
+                    URL.revokeObjectURL(fileURL);
+                }
+            );
         }
         
         function setupOrbitControls() {
@@ -1480,6 +1655,24 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
         
+        // Toggle pause/play
+        function toggleSimulationPause() {
+            isSimulationPaused = !isSimulationPaused;
+            
+            // Update button text
+            const pauseButton = document.getElementById('pause-button');
+            const pauseText = document.getElementById('pause-text');
+            const pauseIcon = document.getElementById('pause-icon');
+            
+            if (isSimulationPaused) {
+                pauseText.textContent = 'Resume';
+                pauseIcon.textContent = '▶️';
+            } else {
+                pauseText.textContent = 'Pause';
+                pauseIcon.textContent = '⏸️';
+            }
+        }
+        
         // Update FPS counter
         function updateFPSCounter(now) {
             frameCount++;
@@ -1529,8 +1722,6 @@
                     updateFireColors();
                 }
             }
-            
-            
             
             renderer.render(scene, camera);
         }
@@ -1676,12 +1867,32 @@
             particleSystem.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
             particleMaterial.vertexColors = true;
         }
-
-        // Checks if sim is paused
-        function toggleSimulationPause() {
-            isSimulationPaused = !isSimulationPaused;
+        
+        // Check for collision between a particle and the loaded model
+        function checkModelCollision(particlePos, particleRadius) {
+            if (!loadedModel || modelMeshes.length === 0) return null;
+            
+            // Create particle sphere for collision check
+            const particleSphere = new THREE.Sphere(
+                new THREE.Vector3(particlePos[0], particlePos[1], particlePos[2]), 
+                particleRadius
+            );
+            
+            // Check against each mesh in the model
+            for (const meshData of modelMeshes) {
+                // Quick bounding box check first
+                if (meshData.boundingBox.intersectsSphere(particleSphere)) {
+                    // For basic implementation, just return the fact that there is a collision
+                    // In a more advanced implementation, you'd calculate exact collision point and normal
+                    return {
+                        mesh: meshData.mesh,
+                        position: new THREE.Vector3(particlePos[0], particlePos[1], particlePos[2])
+                    };
+                }
+            }
+            
+            return null;
         }
-
 
         // Update the SPH simulation
         function updateSimulation(deltaTime) {
@@ -1818,6 +2029,36 @@
                 tempVelocities[i * 3] += (pressureForceX + viscosityForceX + surfaceTensionForceX) * deltaTime;
                 tempVelocities[i * 3 + 1] += (pressureForceY + viscosityForceY + surfaceTensionForceY) * deltaTime;
                 tempVelocities[i * 3 + 2] += (pressureForceZ + viscosityForceZ + surfaceTensionForceZ) * deltaTime;
+                
+                // Check for collision with loaded model
+                const collision = checkModelCollision(pos, params.smoothingRadius * 0.5);
+                if (collision) {
+                    // Get direction from mesh to particle
+                    const meshPos = collision.mesh.position || new THREE.Vector3(0, 0, 0);
+                    const dirFromMesh = new THREE.Vector3(
+                        pos[0] - meshPos.x,
+                        pos[1] - meshPos.y,
+                        pos[2] - meshPos.z
+                    ).normalize();
+                    
+                    // Reflect velocity along normal direction
+                    const vel3 = new THREE.Vector3(tempVelocities[i * 3], tempVelocities[i * 3 + 1], tempVelocities[i * 3 + 2]);
+                    const normalComponent = vel3.dot(dirFromMesh);
+                    
+                    if (normalComponent < 0) {
+                        vel3.sub(dirFromMesh.multiplyScalar(normalComponent * 2 * params.collisionDamping));
+                        
+                        // Apply the reflected velocity
+                        tempVelocities[i * 3] = vel3.x;
+                        tempVelocities[i * 3 + 1] = vel3.y;
+                        tempVelocities[i * 3 + 2] = vel3.z;
+                        
+                        // Move particle slightly away from collision point to prevent sticking
+                        pos[0] += dirFromMesh.x * params.smoothingRadius * 0.1;
+                        pos[1] += dirFromMesh.y * params.smoothingRadius * 0.1;
+                        pos[2] += dirFromMesh.z * params.smoothingRadius * 0.1;
+                    }
+                }
                 
                 // Handle collisions with container bounds
                 const halfSize = params.boundSize / 2;
