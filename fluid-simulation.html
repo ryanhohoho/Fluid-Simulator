@@ -662,6 +662,10 @@
         let fpsLastUpdate = 0;
         let loadedModel = null;
         let modelMeshes = [];
+        let raycaster, mouse;
+        let isDragging = false;
+        let selectedObject = null;
+        let dragOffset = new THREE.Vector3();
         
         // Initialize the scene
         function init() {
@@ -682,6 +686,10 @@
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+            
+            // Setup raycaster and mouse for object interaction
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
             
             // Import OrbitControls
             const OrbitControls = setupOrbitControls();
@@ -821,6 +829,11 @@
             // Handle window resize
             window.addEventListener('resize', onWindowResize);
             
+            // Handle mouse events for model dragging
+            renderer.domElement.addEventListener('mousedown', onMouseDown);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('mouseup', onMouseUp);
+            
             // Handle key events
             window.addEventListener('keydown', (event) => {
                 if (event.key === ' ') {
@@ -874,9 +887,24 @@
                 fileURL,
                 // onLoad callback
                 function(object) {
-                    // Scale and position the model
-                    object.scale.set(2, 2, 2);
+                    // Calculate the bounding box to get dimensions
+                    const boundingBox = new THREE.Box3().setFromObject(object);
+                    const size = new THREE.Vector3();
+                    boundingBox.getSize(size);
+                    
+                    // Find the largest dimension
+                    const maxDimension = Math.max(size.x, size.y, size.z);
+                    
+                    // Calculate scaling factor to make largest dimension half the box width
+                    const targetSize = params.boundSize / 2;
+                    const scaleFactor = targetSize / maxDimension;
+                    
+                    // Apply scaling
+                    object.scale.set(scaleFactor, scaleFactor, scaleFactor);
                     object.position.set(0, 0, 0);
+                    
+                    // Make the object draggable
+                    object.userData.isDraggable = true;
                     
                     // Apply materials and store meshes
                     object.traverse(function(child) {
@@ -1894,6 +1922,96 @@
             return null;
         }
 
+        // Mouse interaction functions
+        function onMouseDown(event) {
+            // Calculate mouse position in normalized device coordinates (-1 to +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Update the picking ray with the camera and mouse position
+            raycaster.setFromCamera(mouse, camera);
+            
+            // If we have a model, check for intersections
+            if (loadedModel) {
+                const intersects = raycaster.intersectObject(loadedModel, true);
+                
+                if (intersects.length > 0) {
+                    // Disable OrbitControls temporarily
+                    controls.enabled = false;
+                    
+                    // Start dragging
+                    isDragging = true;
+                    selectedObject = loadedModel;
+                    
+                    // Calculate the offset
+                    const intersectionPoint = intersects[0].point;
+                    dragOffset.copy(intersectionPoint).sub(loadedModel.position);
+                }
+            }
+        }
+        
+        function onMouseMove(event) {
+            if (isDragging && selectedObject) {
+                // Update mouse position
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Cast a ray from the camera to the mouse position
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Calculate a plane perpendicular to the camera direction
+                const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
+                const plane = new THREE.Plane(planeNormal, -selectedObject.position.z);
+                
+                // Find the point of intersection with the plane
+                const intersection = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersection);
+                
+                // Set object position, accounting for the offset
+                selectedObject.position.copy(intersection.sub(dragOffset));
+                
+                // Constrain movement to within the bounds
+                const halfSize = params.boundSize / 2;
+                const boundingBox = new THREE.Box3().setFromObject(selectedObject);
+                const size = new THREE.Vector3();
+                boundingBox.getSize(size);
+                
+                // Constrain X position
+                if (selectedObject.position.x - size.x/2 < -halfSize) {
+                    selectedObject.position.x = -halfSize + size.x/2;
+                }
+                if (selectedObject.position.x + size.x/2 > halfSize) {
+                    selectedObject.position.x = halfSize - size.x/2;
+                }
+                
+                // Constrain Y position
+                if (selectedObject.position.y - size.y/2 < -halfSize) {
+                    selectedObject.position.y = -halfSize + size.y/2;
+                }
+                if (selectedObject.position.y + size.y/2 > halfSize) {
+                    selectedObject.position.y = halfSize - size.y/2;
+                }
+                
+                // Constrain Z position
+                if (selectedObject.position.z - size.z/2 < -halfSize) {
+                    selectedObject.position.z = -halfSize + size.z/2;
+                }
+                if (selectedObject.position.z + size.z/2 > halfSize) {
+                    selectedObject.position.z = halfSize - size.z/2;
+                }
+            }
+        }
+        
+        function onMouseUp(event) {
+            if (isDragging) {
+                isDragging = false;
+                selectedObject = null;
+                
+                // Re-enable OrbitControls
+                controls.enabled = true;
+            }
+        }
+        
         // Update the SPH simulation
         function updateSimulation(deltaTime) {
             // Clear spatial hash
