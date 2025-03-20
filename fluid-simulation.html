@@ -820,6 +820,196 @@
                 loadOBJModel(fileInput.files[0]);
             });
             
+            // Disintegrate button setup
+            const disintegrateButton = document.createElement('button');
+            disintegrateButton.id = 'disintegrate-button';
+            disintegrateButton.className = 'disintegrate-button';
+            disintegrateButton.innerHTML = '<div class="progress-bar"></div><span>Disintegrate Object</span>';
+            
+            // Add to document after the simulation controls
+            document.querySelector('.sim-controls').appendChild(disintegrateButton);
+            
+            // Style the button
+            const style = document.createElement('style');
+            style.textContent = `
+                .disintegrate-button {
+                    position: relative;
+                    width: 100%;
+                    padding: 0.75rem;
+                    background-color: #333;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    margin-top: 1rem;
+                    overflow: hidden;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+                
+                .progress-bar {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    width: 0%;
+                    background: linear-gradient(to right, #ff4d4d, #ff0000);
+                    opacity: 0.7;
+                    transition: width 0.1s linear;
+                }
+                
+                .disintegrate-button span {
+                    position: relative;
+                    z-index: 1;
+                }
+            `;
+            document.head.appendChild(style);
+            
+            // Disintegration variables
+            let disintegrateProgress = 0;
+            let isDisintegrating = false;
+            let disintegrateInterval = null;
+            const maxDisintegrateTime = 3000; // 3 seconds to disintegrate
+            const progressBar = document.querySelector('.progress-bar');
+            
+            // Disintegrate button events
+            disintegrateButton.addEventListener('mousedown', function() {
+                if (!loadedModel) return;
+                
+                isDisintegrating = true;
+                disintegrateProgress = 0;
+                
+                // Start progress
+                disintegrateInterval = setInterval(function() {
+                    disintegrateProgress += 10;
+                    const percent = Math.min(100, (disintegrateProgress / maxDisintegrateTime) * 100);
+                    progressBar.style.width = percent + '%';
+                    
+                    // Make the model glow
+                    if (loadedModel) {
+                        // Apply glow to all meshes
+                        loadedModel.traverse(function(child) {
+                            if (child instanceof THREE.Mesh) {
+                                // Increase emission/glow intensity
+                                if (!child.material.userData.originalColor) {
+                                    child.material.userData.originalColor = child.material.color.clone();
+                                }
+                                
+                                // Transition from original color to bright red/orange
+                                const glowIntensity = percent / 100;
+                                const color = new THREE.Color().lerpColors(
+                                    child.material.userData.originalColor,
+                                    new THREE.Color(1, 0.3, 0),
+                                    glowIntensity
+                                );
+                                
+                                child.material.color.copy(color);
+                                child.material.emissive = new THREE.Color(color.r * glowIntensity, 
+                                                                        color.g * glowIntensity * 0.3, 
+                                                                        0);
+                                
+                                // Make it more transparent when close to disintegration
+                                if (percent > 80) {
+                                    child.material.opacity = 1 - ((percent - 80) / 20);
+                                }
+                            }
+                        });
+                        
+                        // Add particle effects when close to disintegration
+                        if (percent > 80) {
+                            const particleCount = Math.floor((percent - 80) / 5);
+                            spawnDisintegrationParticles(particleCount);
+                        }
+                    }
+                    
+                    // Check if disintegration is complete
+                    if (disintegrateProgress >= maxDisintegrateTime) {
+                        clearInterval(disintegrateInterval);
+                        disintegrateInterval = null;
+                        isDisintegrating = false;
+                        
+                        // Disintegrate the model (remove it)
+                        if (loadedModel) {
+                            scene.remove(loadedModel);
+                            loadedModel = null;
+                            modelMeshes = [];
+                            progressBar.style.width = '0%';
+                        }
+                    }
+                }, 10);
+            });
+            
+            // Cancel disintegration when mouse is released
+            disintegrateButton.addEventListener('mouseup', cancelDisintegration);
+            disintegrateButton.addEventListener('mouseleave', cancelDisintegration);
+            
+            function cancelDisintegration() {
+                if (!isDisintegrating) return;
+                
+                isDisintegrating = false;
+                clearInterval(disintegrateInterval);
+                
+                // Animate the progress bar back to 0
+                const reverseProgress = setInterval(function() {
+                    disintegrateProgress -= 30;
+                    
+                    if (disintegrateProgress <= 0) {
+                        disintegrateProgress = 0;
+                        clearInterval(reverseProgress);
+                        progressBar.style.width = '0%';
+                        
+                        // Reset model appearance
+                        if (loadedModel) {
+                            loadedModel.traverse(function(child) {
+                                if (child instanceof THREE.Mesh && child.material.userData.originalColor) {
+                                    child.material.color.copy(child.material.userData.originalColor);
+                                    child.material.emissive = new THREE.Color(0, 0, 0);
+                                    child.material.opacity = 0.7;
+                                }
+                            });
+                        }
+                    } else {
+                        const percent = (disintegrateProgress / maxDisintegrateTime) * 100;
+                        progressBar.style.width = percent + '%';
+                    }
+                }, 10);
+            }
+            
+            function spawnDisintegrationParticles(count) {
+                if (!loadedModel) return;
+                
+                // Get the bounding box of the model
+                const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+                const center = new THREE.Vector3();
+                boundingBox.getCenter(center);
+                const size = new THREE.Vector3();
+                boundingBox.getSize(size);
+                
+                // Spawn particles from random points on the model
+                for (let i = 0; i < count; i++) {
+                    // Find a random position within the bounding box
+                    const x = center.x + (Math.random() - 0.5) * size.x;
+                    const y = center.y + (Math.random() - 0.5) * size.y;
+                    const z = center.z + (Math.random() - 0.5) * size.z;
+                    
+                    // Pick a random particle for this effect
+                    const particleIndex = Math.floor(Math.random() * params.particleCount);
+                    
+                    // Set its position to the random location on the model
+                    positions[particleIndex * 3] = x;
+                    positions[particleIndex * 3 + 1] = y;
+                    positions[particleIndex * 3 + 2] = z;
+                    
+                    // Give it an outward velocity from the center
+                    const direction = new THREE.Vector3(x - center.x, y - center.y, z - center.z).normalize();
+                    velocities[particleIndex * 3] = direction.x * 10;
+                    velocities[particleIndex * 3 + 1] = direction.y * 10;
+                    velocities[particleIndex * 3 + 2] = direction.z * 10;
+                }
+            }
+            
             // Preset buttons
             document.getElementById('preset-water').addEventListener('click', () => applyPreset('water'));
             document.getElementById('preset-honey').addEventListener('click', () => applyPreset('honey'));
@@ -903,8 +1093,19 @@
                     object.scale.set(scaleFactor, scaleFactor, scaleFactor);
                     object.position.set(0, 0, 0);
                     
-                    // Make the object draggable
-                    object.userData.isDraggable = true;
+                    // Initialize physics properties
+                    object.userData = {
+                        velocity: new THREE.Vector3(0, 0, 0),
+                        angularVelocity: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5
+                        ),
+                        isDragging: false,
+                        isDraggable: true,
+                        mass: 1.0,
+                        dragStartRotation: new THREE.Euler()
+                    };
                     
                     // Apply materials and store meshes
                     object.traverse(function(child) {
@@ -914,7 +1115,9 @@
                                 color: 0xcccccc,
                                 transparent: true,
                                 opacity: 0.7,
-                                side: THREE.DoubleSide
+                                side: THREE.DoubleSide,
+                                emissive: new THREE.Color(0, 0, 0),
+                                emissiveIntensity: 0
                             });
                             
                             // Store meshes for collision detection
@@ -1725,6 +1928,9 @@
                 controls.update();
             }
             
+            // Update object physics
+            updateObjectPhysics(now);
+            
             if (!isSimulationPaused) {
                 // Get the time elapsed since the last frame
                 const deltaTime = Math.min(clock.getDelta(), 0.05) * params.timeScale;
@@ -1752,6 +1958,87 @@
             }
             
             renderer.render(scene, camera);
+        }
+        
+        // Update physics for loaded objects
+        function updateObjectPhysics(now) {
+            if (!loadedModel) return;
+            
+            // Apply physics if not being dragged
+            if (!loadedModel.userData.isDragging) {
+                // Apply gravity
+                loadedModel.userData.velocity.y += params.gravity * 0.001;
+                
+                // Apply velocity
+                loadedModel.position.add(loadedModel.userData.velocity.clone().multiplyScalar(0.01));
+                
+                // Apply angular velocity (rotation)
+                loadedModel.rotation.x += loadedModel.userData.angularVelocity.x * 0.01;
+                loadedModel.rotation.y += loadedModel.userData.angularVelocity.y * 0.01;
+                loadedModel.rotation.z += loadedModel.userData.angularVelocity.z * 0.01;
+                
+                // Check boundary collisions and handle bouncing
+                const halfSize = params.boundSize / 2;
+                const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+                const size = new THREE.Vector3();
+                boundingBox.getSize(size);
+                const center = new THREE.Vector3();
+                boundingBox.getCenter(center);
+                
+                // Collision with X boundaries
+                if (center.x - size.x/2 < -halfSize) {
+                    loadedModel.position.x += (-halfSize - (center.x - size.x/2));
+                    loadedModel.userData.velocity.x *= -0.7; // Bounce with damping
+                    // Add spin effect
+                    loadedModel.userData.angularVelocity.z -= loadedModel.userData.velocity.y * 0.1;
+                }
+                else if (center.x + size.x/2 > halfSize) {
+                    loadedModel.position.x -= ((center.x + size.x/2) - halfSize);
+                    loadedModel.userData.velocity.x *= -0.7;
+                    // Add spin effect
+                    loadedModel.userData.angularVelocity.z += loadedModel.userData.velocity.y * 0.1;
+                }
+                
+                // Collision with Y boundaries
+                if (center.y - size.y/2 < -halfSize) {
+                    loadedModel.position.y += (-halfSize - (center.y - size.y/2));
+                    loadedModel.userData.velocity.y *= -0.7;
+                    // Add spin based on x velocity
+                    loadedModel.userData.angularVelocity.x += loadedModel.userData.velocity.x * 0.1;
+                }
+                else if (center.y + size.y/2 > halfSize) {
+                    loadedModel.position.y -= ((center.y + size.y/2) - halfSize);
+                    loadedModel.userData.velocity.y *= -0.7;
+                    // Add spin based on x velocity
+                    loadedModel.userData.angularVelocity.x -= loadedModel.userData.velocity.x * 0.1;
+                }
+                
+                // Collision with Z boundaries
+                if (center.z - size.z/2 < -halfSize) {
+                    loadedModel.position.z += (-halfSize - (center.z - size.z/2));
+                    loadedModel.userData.velocity.z *= -0.7;
+                    // Add spin effect
+                    loadedModel.userData.angularVelocity.x -= loadedModel.userData.velocity.y * 0.1;
+                }
+                else if (center.z + size.z/2 > halfSize) {
+                    loadedModel.position.z -= ((center.z + size.z/2) - halfSize);
+                    loadedModel.userData.velocity.z *= -0.7;
+                    // Add spin effect
+                    loadedModel.userData.angularVelocity.x += loadedModel.userData.velocity.y * 0.1;
+                }
+                
+                // Apply damping to velocities
+                loadedModel.userData.velocity.multiplyScalar(0.99);
+                loadedModel.userData.angularVelocity.multiplyScalar(0.99);
+                
+                // Update model bounding boxes for collision
+                updateModelBoundingBoxes();
+            } else {
+                // Even when dragging, still apply rotation based on angular velocity
+                loadedModel.rotation.x += loadedModel.userData.angularVelocity.x * 0.01;
+                loadedModel.rotation.y += loadedModel.userData.angularVelocity.y * 0.01;
+                loadedModel.rotation.z += loadedModel.userData.angularVelocity.z * 0.01;
+            }
         }
         
         // Update smooth surface with current particle positions
@@ -1910,12 +2197,32 @@
             for (const meshData of modelMeshes) {
                 // Quick bounding box check first
                 if (meshData.boundingBox.intersectsSphere(particleSphere)) {
-                    // For basic implementation, just return the fact that there is a collision
-                    // In a more advanced implementation, you'd calculate exact collision point and normal
-                    return {
-                        mesh: meshData.mesh,
-                        position: new THREE.Vector3(particlePos[0], particlePos[1], particlePos[2])
-                    };
+                    // Create a raycaster for more accurate collision detection
+                    const rayDirection = new THREE.Vector3();
+                    const particleCenter = new THREE.Vector3(particlePos[0], particlePos[1], particlePos[2]);
+                    
+                    // Find the closest point on the bounding box to the particle
+                    const closestPoint = new THREE.Vector3();
+                    meshData.boundingBox.clampPoint(particleCenter, closestPoint);
+                    
+                    // Direction from closest point to particle center
+                    rayDirection.subVectors(particleCenter, closestPoint).normalize();
+                    
+                    // Create raycaster from the closest point on bounding box toward particle
+                    const ray = new THREE.Raycaster(closestPoint, rayDirection.clone().negate(), 0, particleRadius * 2);
+                    
+                    // Check for intersection with the mesh
+                    const intersects = ray.intersectObject(meshData.mesh);
+                    
+                    if (intersects.length > 0 && intersects[0].distance < particleRadius) {
+                        // We have a collision - return collision info
+                        return {
+                            mesh: meshData.mesh,
+                            normal: intersects[0].face.normal.clone(),
+                            point: intersects[0].point.clone(),
+                            distance: intersects[0].distance
+                        };
+                    }
                 }
             }
             
@@ -1946,6 +2253,12 @@
                     // Calculate the offset
                     const intersectionPoint = intersects[0].point;
                     dragOffset.copy(intersectionPoint).sub(loadedModel.position);
+                    
+                    // Store current rotation and physics state
+                    loadedModel.userData.dragStartRotation = loadedModel.rotation.clone();
+                    
+                    // We don't stop physics completely - we'll still allow rotation
+                    loadedModel.userData.isDragging = true;
                 }
             }
         }
@@ -1968,47 +2281,46 @@
                 raycaster.ray.intersectPlane(plane, intersection);
                 
                 // Set object position, accounting for the offset
-                selectedObject.position.copy(intersection.sub(dragOffset));
+                const newPosition = intersection.clone().sub(dragOffset);
                 
-                // Constrain movement to within the bounds
-                const halfSize = params.boundSize / 2;
-                const boundingBox = new THREE.Box3().setFromObject(selectedObject);
-                const size = new THREE.Vector3();
-                boundingBox.getSize(size);
+                // Apply new position to object's physics state
+                selectedObject.userData.velocity.copy(newPosition.clone().sub(selectedObject.position).multiplyScalar(20));
+                selectedObject.position.copy(newPosition);
                 
-                // Constrain X position
-                if (selectedObject.position.x - size.x/2 < -halfSize) {
-                    selectedObject.position.x = -halfSize + size.x/2;
-                }
-                if (selectedObject.position.x + size.x/2 > halfSize) {
-                    selectedObject.position.x = halfSize - size.x/2;
-                }
-                
-                // Constrain Y position
-                if (selectedObject.position.y - size.y/2 < -halfSize) {
-                    selectedObject.position.y = -halfSize + size.y/2;
-                }
-                if (selectedObject.position.y + size.y/2 > halfSize) {
-                    selectedObject.position.y = halfSize - size.y/2;
-                }
-                
-                // Constrain Z position
-                if (selectedObject.position.z - size.z/2 < -halfSize) {
-                    selectedObject.position.z = -halfSize + size.z/2;
-                }
-                if (selectedObject.position.z + size.z/2 > halfSize) {
-                    selectedObject.position.z = halfSize - size.z/2;
-                }
+                // Update bounding boxes for collision
+                updateModelBoundingBoxes();
             }
         }
         
         function onMouseUp(event) {
             if (isDragging) {
                 isDragging = false;
-                selectedObject = null;
+                
+                if (selectedObject) {
+                    // Release the object but keep its momentum
+                    selectedObject.userData.isDragging = false;
+                    selectedObject = null;
+                }
                 
                 // Re-enable OrbitControls
                 controls.enabled = true;
+            }
+        }
+        
+        // Update model bounding boxes
+        function updateModelBoundingBoxes() {
+            if (loadedModel) {
+                modelMeshes = []; // Clear previous meshes
+                loadedModel.traverse(function(child) {
+                    if (child instanceof THREE.Mesh) {
+                        const boundingBox = new THREE.Box3().setFromObject(child);
+                        modelMeshes.push({
+                            mesh: child,
+                            geometry: child.geometry,
+                            boundingBox: boundingBox
+                        });
+                    }
+                });
             }
         }
         
@@ -2151,30 +2463,47 @@
                 // Check for collision with loaded model
                 const collision = checkModelCollision(pos, params.smoothingRadius * 0.5);
                 if (collision) {
-                    // Get direction from mesh to particle
-                    const meshPos = collision.mesh.position || new THREE.Vector3(0, 0, 0);
-                    const dirFromMesh = new THREE.Vector3(
-                        pos[0] - meshPos.x,
-                        pos[1] - meshPos.y,
-                        pos[2] - meshPos.z
-                    ).normalize();
+                    // Get direction from collision point to particle
+                    const normal = collision.normal.clone();
                     
                     // Reflect velocity along normal direction
                     const vel3 = new THREE.Vector3(tempVelocities[i * 3], tempVelocities[i * 3 + 1], tempVelocities[i * 3 + 2]);
-                    const normalComponent = vel3.dot(dirFromMesh);
+                    const normalComponent = vel3.dot(normal);
                     
                     if (normalComponent < 0) {
-                        vel3.sub(dirFromMesh.multiplyScalar(normalComponent * 2 * params.collisionDamping));
+                        // Reflect with damping
+                        vel3.sub(normal.multiplyScalar(normalComponent * 2 * params.collisionDamping));
                         
                         // Apply the reflected velocity
                         tempVelocities[i * 3] = vel3.x;
                         tempVelocities[i * 3 + 1] = vel3.y;
                         tempVelocities[i * 3 + 2] = vel3.z;
                         
-                        // Move particle slightly away from collision point to prevent sticking
-                        pos[0] += dirFromMesh.x * params.smoothingRadius * 0.1;
-                        pos[1] += dirFromMesh.y * params.smoothingRadius * 0.1;
-                        pos[2] += dirFromMesh.z * params.smoothingRadius * 0.1;
+                        // Move particle away from collision to prevent sticking
+                        pos[0] += normal.x * params.smoothingRadius * 0.1;
+                        pos[1] += normal.y * params.smoothingRadius * 0.1;
+                        pos[2] += normal.z * params.smoothingRadius * 0.1;
+                        
+                        // Apply force to the model if it exists
+                        if (loadedModel) {
+                            // Scale factor for model mass
+                            const forceFactor = 0.002;
+                            
+                            // Apply force in opposite direction to the normal
+                            loadedModel.userData.velocity.x -= normal.x * forceFactor * Math.abs(vel3.x);
+                            loadedModel.userData.velocity.y -= normal.y * forceFactor * Math.abs(vel3.y);
+                            loadedModel.userData.velocity.z -= normal.z * forceFactor * Math.abs(vel3.z);
+                            
+                            // Apply torque (approximate)
+                            const collisionPoint = collision.point.clone();
+                            const modelCenter = loadedModel.position.clone();
+                            const torqueDir = new THREE.Vector3().crossVectors(
+                                collisionPoint.sub(modelCenter),
+                                normal
+                            ).normalize().multiplyScalar(0.0005);
+                            
+                            loadedModel.userData.angularVelocity.add(torqueDir);
+                        }
                     }
                 }
                 
