@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log in to Your Account</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root {
+            --bg-color: #000;
+            --text-color: #fff;
+            --input-bg: #111;
+            --input-border: #333;
+            --input-focus-border: #888;
+            --button-bg: #eee;
+            --button-text: #000;
+            --button-hover-bg: #ddd;
+            --button-active-bg: #ccc;
+            --google-button-bg: #fff;
+            --google-button-text: #000;
+            --google-button-hover-bg: #f5f5f5;
+            --link-color: #3291ff;
+            --error-color: #ff4d4f;
+            --divider-color: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .login-header h1 {
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(to right, #c8b6ff, #ffffff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--input-focus-border);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--button-hover-bg);
+        }
+
+        .btn-primary:active {
+            background-color: var(--button-active-bg);
+        }
+
+        .btn-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .btn-google {
+            background-color: var(--google-button-bg);
+            color: var(--google-button-text);
+            border: 1px solid #ddd;
+        }
+
+        .btn-google:hover {
+            background-color: var(--google-button-hover-bg);
+        }
+
+        .divider-container {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .divider {
+            flex-grow: 1;
+            height: 1px;
+            background-color: var(--divider-color);
+        }
+
+        .divider-text {
+            padding: 0 16px;
+            color: #888;
+            font-size: 14px;
+        }
+
+        .login-footer {
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .login-footer a {
+            color: var(--link-color);
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .login-footer a:hover {
+            opacity: 0.8;
+        }
+
+        .error-message {
+            color: var(--error-color);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--button-text);
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translate(-50%, 10px);
+        }
+
+        .toast.success {
+            background-color: #52c41a;
+        }
+
+        .toast.error {
+            background-color: #ff4d4f;
+        }
+
+        /* Animation for entering */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-container {
+            animation: fadeIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Log in to Your Account</h1>
+        </div>
+
+        <div class="login-form">
+            <div id="emailForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" class="form-control" placeholder="Enter your email" autocomplete="email">
+                    <div id="emailError" class="error-message hidden"></div>
+                </div>
+
+                <button type="button" id="continueWithEmail" class="btn btn-primary">
+                    <span class="btn-text">Continue with Email</span>
+                    <span class="spinner hidden"></span>
+                </button>
+            </div>
+
+            <div id="passwordForm" class="hidden">
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" placeholder="Enter your password" autocomplete="current-password">
+                    <div id="passwordError" class="error-message hidden"></div>
+                </div>
+
+                <button type="button" id="loginButton" class="btn btn-primary">
+                    <span class="btn-text">Log In</span>
+                    <span class="spinner hidden"></span>
+                </button>
+
+                <div class="form-group">
+                    <a href="#" id="backToEmail">Use a different email</a>
+                </div>
+            </div>
+
+            <div class="divider-container">
+                <div class="divider"></div>
+                <span class="divider-text">OR</span>
+                <div class="divider"></div>
+            </div>
+
+            <button type="button" id="googleSignInButton" class="btn btn-google">
+                <svg class="btn-icon" viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="matrix(1, 0, 0, 1, 0, 0)" opacity="1">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.79-.07-1.54-.19-2.27h-11.3v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"></path>
+                        <path fill="#34A853" d="M12.255 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-3.98v3.09c1.97 3.92 6.02 6.62 10.71 6.62z"></path>
+                        <path fill="#FBBC05" d="M5.525 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29v-3.09h-3.98c-.82 1.62-1.29 3.44-1.29 5.38s.47 3.76 1.29 5.38l3.98-3.09z"></path>
+                        <path fill="#EA4335" d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42c-2.08-1.94-4.78-3.13-8.02-3.13-4.69 0-8.74 2.7-10.71 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"></path>
+                    </g>
+                </svg>
+                Sign in with Google
+            </button>
+        </div>
+
+        <div class="login-footer">
+            <a href="#" id="otherLoginOptions">← Other Login options</a>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <div id="g_id_onload"
+         data-client_id="YOUR_GOOGLE_CLIENT_ID"
+         data-context="signin"
+         data-ux_mode="popup"
+         data-callback="handleGoogleSignIn"
+         data-auto_prompt="false">
+    </div>
+
+    <script>
+        // Elements
+        const emailForm = document.getElementById('emailForm');
+        const passwordForm = document.getElementById('passwordForm');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const emailError = document.getElementById('emailError');
+        const passwordError = document.getElementById('passwordError');
+        const continueWithEmail = document.getElementById('continueWithEmail');
+        const loginButton = document.getElementById('loginButton');
+        const backToEmail = document.getElementById('backToEmail');
+        const googleSignInButton = document.getElementById('googleSignInButton');
+        const otherLoginOptions = document.getElementById('otherLoginOptions');
+        const toast = document.getElementById('toast');
+
+        // Regular expressions for validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        // Continue with Email button click handler
+        continueWithEmail.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            // Validate email
+            const email = emailInput.value.trim();
+            if (!email) {
+                showError(emailError, 'Email is required');
+                return;
+            }
+            
+            if (!emailRegex.test(email)) {
+                showError(emailError, 'Please enter a valid email address');
+                return;
+            }
+            
+            hideError(emailError);
+            
+            // Show loading spinner
+            const btnText = continueWithEmail.querySelector('.btn-text');
+            const spinner = continueWithEmail.querySelector('.spinner');
+            btnText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            
+            try {
+                // Simulate API call to check if user exists
+                await simulateApiCall(email);
+                
+                // Check if user exists (in a real app, this would be determined by the API response)
+                const userExists = await checkUserExists(email);
+                
+                if (userExists) {
+                    // User exists, show password form
+                    emailForm.classList.add('hidden');
+                    passwordForm.classList.remove('hidden');
+                    passwordInput.focus();
+                } else {
+                    // User doesn't exist, redirect to signup
+                    showToast('No account found with this email. Redirecting to signup...', 'error');
+                    setTimeout(() => {
+                        // In a real app, redirect to signup page
+                        // window.location.href = '/signup?email=' + encodeURIComponent(email);
+                        
+                        // For demo, just go back to email form
+                        btnText.classList.remove('hidden');
+                        spinner.classList.add('hidden');
+                        showToast('Signup functionality will be implemented in the backend.', 'info');
+                    }, 2000);
+                }
+            } catch (error) {
+                showToast('An error occurred. Please try again.', 'error');
+            } finally {
+                btnText.classList.remove('hidden');
+                spinner.classList.add('hidden');
+            }
+        });
+
+        // Login button click handler
+        loginButton.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            // Validate password
+            const password = passwordInput.value.trim();
+            if (!password) {
+                showError(passwordError, 'Password is required');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showError(passwordError, 'Password must be at least 6 characters');
+                return;
+            }
+            
+            hideError(passwordError);
+            
+            // Show loading spinner
+            const btnText = loginButton.querySelector('.btn-text');
+            const spinner = loginButton.querySelector('.spinner');
+            btnText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            
+            try {
+                // Simulate login API call
+                await simulateApiCall({ 
+                    email: emailInput.value.trim(), 
+                    password: password 
+                });
+                
+                // In a real app, the API would validate credentials and return a success/error
+                const loginSuccessful = await attemptLogin(emailInput.value.trim(), password);
+                
+                if (loginSuccessful) {
+                    showToast('Login successful!', 'success');
+                    setTimeout(() => {
+                        // Redirect to dashboard or home page
+                        // window.location.href = '/dashboard';
+                        
+                        // For demo, just show a message
+                        showToast('Redirecting to dashboard...', 'success');
+                    }, 1000);
+                } else {
+                    showToast('Invalid email or password', 'error');
+                }
+            } catch (error) {
+                showToast('An error occurred during login. Please try again.', 'error');
+            } finally {
+                btnText.classList.remove('hidden');
+                spinner.classList.add('hidden');
+            }
+        });
+
+        // Back to email link handler
+        backToEmail.addEventListener('click', (e) => {
+            e.preventDefault();
+            passwordForm.classList.add('hidden');
+            emailForm.classList.remove('hidden');
+            emailInput.focus();
+        });
+
+        // Google Sign In button handler
+        googleSignInButton.addEventListener('click', () => {
+            // This will trigger the Google Sign In popup
+            // The actual sign-in functionality is handled by the Google Identity Services SDK
+            // which is loaded in the header and configured with the g_id_onload element
+            
+            // For demonstration, show a toast
+            showToast('Google Sign In functionality requires your Google OAuth credentials.', 'info');
+        });
+
+        // Other Login options link handler
+        otherLoginOptions.addEventListener('click', (e) => {
+            e.preventDefault();
+            showToast('Other login options would be shown here', 'info');
+        });
+
+        // Google Sign In callback handler
+        window.handleGoogleSignIn = async (response) => {
+            // In a real app, you would send the ID token to your backend
+            // The backend would verify the token with Google and create a session
+            const token = response.credential;
+            
+            try {
+                // Simulate API call to validate token
+                await simulateApiCall({ token });
+                
+                showToast('Google Sign In successful!', 'success');
+                setTimeout(() => {
+                    // Redirect to dashboard or home page
+                    // window.location.href = '/dashboard';
+                    
+                    // For demo, just show a message
+                    showToast('Redirecting to dashboard...', 'success');
+                }, 1000);
+            } catch (error) {
+                showToast('An error occurred during Google Sign In. Please try again.', 'error');
+            }
+        };
+
+        // Utility functions
+        function showError(element, message) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+
+        function hideError(element) {
+            element.textContent = '';
+            element.classList.add('hidden');
+        }
+
+        function showToast(message, type = 'info') {
+            toast.textContent = message;
+            toast.className = 'toast';
+            toast.classList.add(type);
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Simulate an API call (will be replaced with real API calls)
+        function simulateApiCall(data) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(data);
+                }, 1000);
+            });
+        }
+
+        // Check if user exists (will be replaced with real API call)
+        function checkUserExists(email) {
+            // For demo purposes, let's assume any email ending with @example.com exists
+            // In a real app, this would be a call to your backend API
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(email.endsWith('@example.com'));
+                }, 500);
+            });
+        }
+
+        // Attempt login (will be replaced with real API call)
+        function attemptLogin(email, password) {
+            // For demo purposes, let's consider any login with @example.com and password "password123" as successful
+            // In a real app, this would be a call to your backend API
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(email.endsWith('@example.com') && password === 'password123');
+                }, 500);
+            });
+        }
+
+        // Input event listeners for real-time validation
+        emailInput.addEventListener('input', () => {
+            const email = emailInput.value.trim();
+            if (email && !emailRegex.test(email)) {
+                showError(emailError, 'Please enter a valid email address');
+            } else {
+                hideError(emailError);
+            }
+        });
+
+        passwordInput.addEventListener('input', () => {
+            const password = passwordInput.value.trim();
+            if (password && password.length < 6) {
+                showError(passwordError, 'Password must be at least 6 characters');
+            } else {
+                hideError(passwordError);
+            }
+        });
+
+        // Press Enter to submit
+        emailInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                continueWithEmail.click();
+            }
+        });
+
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loginButton.click();
+            }
+        });
+
+        // Initial focus
+        emailInput.focus();
+    </script>
+</body>
+</html>
