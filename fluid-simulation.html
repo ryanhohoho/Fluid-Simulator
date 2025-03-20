@@ -930,8 +930,12 @@
                         disintegrateInterval = null;
                         isDisintegrating = false;
                         
-                        // Disintegrate the model (remove it)
+                        // Disintegrate the model with explosion
                         if (loadedModel) {
+                            // Create explosion effect
+                            createExplosionEffect(loadedModel);
+                            
+                            // Then remove the model
                             scene.remove(loadedModel);
                             loadedModel = null;
                             modelMeshes = [];
@@ -952,10 +956,20 @@
                 clearInterval(disintegrateInterval);
                 
                 // Animate the progress bar back to 0
+                const initialProgress = disintegrateProgress;
+                const reverseStartTime = Date.now();
+                const reverseDuration = 1000; // 1 second to reverse
+                
                 const reverseProgress = setInterval(function() {
-                    disintegrateProgress -= 30;
+                    const elapsed = Date.now() - reverseStartTime;
+                    const t = Math.min(1, elapsed / reverseDuration);
                     
-                    if (disintegrateProgress <= 0) {
+                    // Easing function for smooth reversal
+                    const easeOut = 1 - Math.pow(1 - t, 2);
+                    
+                    disintegrateProgress = initialProgress * (1 - easeOut);
+                    
+                    if (disintegrateProgress <= 0 || t >= 1) {
                         disintegrateProgress = 0;
                         clearInterval(reverseProgress);
                         progressBar.style.width = '0%';
@@ -973,8 +987,98 @@
                     } else {
                         const percent = (disintegrateProgress / maxDisintegrateTime) * 100;
                         progressBar.style.width = percent + '%';
+                        
+                        // Update model glow to match progress
+                        if (loadedModel) {
+                            loadedModel.traverse(function(child) {
+                                if (child instanceof THREE.Mesh && child.material.userData.originalColor) {
+                                    // Calculate glowIntensity based on current progress
+                                    const glowIntensity = percent / 100;
+                                    
+                                    // Smoothly transition color back to original
+                                    const color = new THREE.Color().lerpColors(
+                                        child.material.userData.originalColor,
+                                        new THREE.Color(1, 0.3, 0),
+                                        glowIntensity
+                                    );
+                                    
+                                    child.material.color.copy(color);
+                                    child.material.emissive = new THREE.Color(
+                                        color.r * glowIntensity, 
+                                        color.g * glowIntensity * 0.3, 
+                                        0
+                                    );
+                                    
+                                    // Restore opacity
+                                    child.material.opacity = 0.7;
+                                }
+                            });
+                        }
                     }
-                }, 10);
+                }, 16); // 60fps
+            }
+            
+            // Create explosion effect
+            function createExplosionEffect(model) {
+                // Store the model's position and size before removing it
+                const modelPosition = model.position.clone();
+                const boundingBox = new THREE.Box3().setFromObject(model);
+                const modelSize = new THREE.Vector3();
+                boundingBox.getSize(modelSize);
+                
+                // Create explosion particles
+                const explosionParticleCount = 150;
+                const explosionRadius = Math.max(modelSize.x, modelSize.y, modelSize.z) / 2;
+                
+                // Determine color from model
+                let explosionColor = new THREE.Color(0xffffff); // Default white
+                
+                model.traverse(function(child) {
+                    if (child instanceof THREE.Mesh && child.material.userData.originalColor) {
+                        explosionColor = child.material.userData.originalColor;
+                    }
+                });
+                
+                // Create explosive particles at the model's position
+                for (let i = 0; i < explosionParticleCount; i++) {
+                    // Get a random direction for the particle
+                    const phi = Math.random() * Math.PI * 2;
+                    const theta = Math.random() * Math.PI;
+                    const radius = explosionRadius * (0.3 + Math.random() * 0.7);
+                    
+                    // Calculate position (spherical coordinates)
+                    const x = modelPosition.x + radius * Math.sin(theta) * Math.cos(phi);
+                    const y = modelPosition.y + radius * Math.sin(theta) * Math.sin(phi);
+                    const z = modelPosition.z + radius * Math.cos(theta);
+                    
+                    // Create explosion particle
+                    createExplosionParticle(
+                        new THREE.Vector3(x, y, z),
+                        new THREE.Vector3(
+                            (x - modelPosition.x) * (0.5 + Math.random() * 0.5) * 0.1,
+                            (y - modelPosition.y) * (0.5 + Math.random() * 0.5) * 0.1,
+                            (z - modelPosition.z) * (0.5 + Math.random() * 0.5) * 0.1
+                        ),
+                        explosionColor
+                    );
+                }
+            }
+            
+            function createExplosionParticle(position, velocity, color) {
+                // Use existing particles from the simulation for the explosion effect
+                const particleIndex = Math.floor(Math.random() * params.particleCount);
+                
+                // Set position and velocity
+                positions[particleIndex * 3] = position.x;
+                positions[particleIndex * 3 + 1] = position.y;
+                positions[particleIndex * 3 + 2] = position.z;
+                
+                velocities[particleIndex * 3] = velocity.x * 20;     // Scale for more explosive effect
+                velocities[particleIndex * 3 + 1] = velocity.y * 20;
+                velocities[particleIndex * 3 + 2] = velocity.z * 20;
+                
+                // If the particle system supports individual colors, we could set the color here
+                // For now, let's just use the existing particle system's color
             }
             
             function spawnDisintegrationParticles(count) {
@@ -2187,42 +2291,68 @@
         function checkModelCollision(particlePos, particleRadius) {
             if (!loadedModel || modelMeshes.length === 0) return null;
             
+            // Skip detailed collision checks if the model is far from the particle
+            // This is a quick broad-phase check to improve performance
+            const modelPos = loadedModel.position;
+            const dx = particlePos[0] - modelPos.x;
+            const dy = particlePos[1] - modelPos.y;
+            const dz = particlePos[2] - modelPos.z;
+            const distSquared = dx*dx + dy*dy + dz*dz;
+            
+            // Get approximate model radius
+            let maxModelDimension = 0;
+            if (modelMeshes.length > 0) {
+                const size = new THREE.Vector3();
+                modelMeshes[0].boundingBox.getSize(size);
+                maxModelDimension = Math.max(size.x, size.y, size.z) * 0.5;
+            }
+            
+            // Early exit if the particle is definitely too far away
+            if (distSquared > Math.pow(maxModelDimension + particleRadius * 2, 2)) {
+                return null;
+            }
+            
             // Create particle sphere for collision check
             const particleSphere = new THREE.Sphere(
                 new THREE.Vector3(particlePos[0], particlePos[1], particlePos[2]), 
                 particleRadius
             );
             
+            // We'll limit the number of detailed checks per frame to improve performance
+            // This is a sampling approach - not all collisions will be detected every frame
+            // but over multiple frames most will be handled
+            const maxChecksPerFrame = 3; // Adjust based on performance testing
+            let checksPerformed = 0;
+            
             // Check against each mesh in the model
             for (const meshData of modelMeshes) {
                 // Quick bounding box check first
                 if (meshData.boundingBox.intersectsSphere(particleSphere)) {
-                    // Create a raycaster for more accurate collision detection
-                    const rayDirection = new THREE.Vector3();
-                    const particleCenter = new THREE.Vector3(particlePos[0], particlePos[1], particlePos[2]);
+                    checksPerformed++;
                     
-                    // Find the closest point on the bounding box to the particle
-                    const closestPoint = new THREE.Vector3();
-                    meshData.boundingBox.clampPoint(particleCenter, closestPoint);
+                    // Simple collision detection - just use the direction from mesh center to particle
+                    const meshCenter = new THREE.Vector3();
+                    meshData.boundingBox.getCenter(meshCenter);
                     
-                    // Direction from closest point to particle center
-                    rayDirection.subVectors(particleCenter, closestPoint).normalize();
+                    const direction = new THREE.Vector3(
+                        particlePos[0] - meshCenter.x,
+                        particlePos[1] - meshCenter.y,
+                        particlePos[2] - meshCenter.z
+                    ).normalize();
                     
-                    // Create raycaster from the closest point on bounding box toward particle
-                    const ray = new THREE.Raycaster(closestPoint, rayDirection.clone().negate(), 0, particleRadius * 2);
+                    return {
+                        mesh: meshData.mesh,
+                        normal: direction,
+                        point: new THREE.Vector3(
+                            particlePos[0] - direction.x * particleRadius,
+                            particlePos[1] - direction.y * particleRadius,
+                            particlePos[2] - direction.z * particleRadius
+                        ),
+                        distance: particleRadius
+                    };
                     
-                    // Check for intersection with the mesh
-                    const intersects = ray.intersectObject(meshData.mesh);
-                    
-                    if (intersects.length > 0 && intersects[0].distance < particleRadius) {
-                        // We have a collision - return collision info
-                        return {
-                            mesh: meshData.mesh,
-                            normal: intersects[0].face.normal.clone(),
-                            point: intersects[0].point.clone(),
-                            distance: intersects[0].distance
-                        };
-                    }
+                    // Limit the number of detailed checks per frame
+                    if (checksPerformed >= maxChecksPerFrame) break;
                 }
             }
             
@@ -2329,222 +2459,260 @@
             // Clear spatial hash
             spatialHash = {};
             
-            // Build spatial hash
-            const cellSize = params.smoothingRadius * 2;
-            for (let i = 0; i < params.particleCount; i++) {
-                const x = Math.floor(positions[i * 3] / cellSize);
-                const y = Math.floor(positions[i * 3 + 1] / cellSize);
-                const z = Math.floor(positions[i * 3 + 2] / cellSize);
-                
-                const cellKey = `${x},${y},${z}`;
-                if (!spatialHash[cellKey]) {
-                    spatialHash[cellKey] = [];
+            // Only rebuild the spatial hash every few frames to improve performance
+            // This is a common optimization for fluid simulations
+            const rebuildSpatialHash = frameCount % 2 === 0;
+            
+            if (rebuildSpatialHash) {
+                // Build spatial hash
+                const cellSize = params.smoothingRadius * 2;
+                for (let i = 0; i < params.particleCount; i++) {
+                    const x = Math.floor(positions[i * 3] / cellSize);
+                    const y = Math.floor(positions[i * 3 + 1] / cellSize);
+                    const z = Math.floor(positions[i * 3 + 2] / cellSize);
+                    
+                    const cellKey = `${x},${y},${z}`;
+                    if (!spatialHash[cellKey]) {
+                        spatialHash[cellKey] = [];
+                    }
+                    spatialHash[cellKey].push(i);
                 }
-                spatialHash[cellKey].push(i);
             }
             
             // Calculate densities
-            for (let i = 0; i < params.particleCount; i++) {
-                const pos = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
-                const cellX = Math.floor(pos[0] / cellSize);
-                const cellY = Math.floor(pos[1] / cellSize);
-                const cellZ = Math.floor(pos[2] / cellSize);
-                
-                densities[i] = 0;
-                
-                // Check neighboring cells
-                for (let nx = -1; nx <= 1; nx++) {
-                    for (let ny = -1; ny <= 1; ny++) {
-                        for (let nz = -1; nz <= 1; nz++) {
-                            const neighborCellKey = `${cellX + nx},${cellY + ny},${cellZ + nz}`;
-                            const particlesInCell = spatialHash[neighborCellKey];
-                            
-                            if (particlesInCell) {
-                                for (const j of particlesInCell) {
-                                    const otherPos = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
-                                    const dx = pos[0] - otherPos[0];
-                                    const dy = pos[1] - otherPos[1];
-                                    const dz = pos[2] - otherPos[2];
-                                    const distSquared = dx * dx + dy * dy + dz * dz;
-                                    
-                                    if (distSquared < params.smoothingRadius * params.smoothingRadius) {
-                                        const dist = Math.sqrt(distSquared);
-                                        const weight = 1 - dist / params.smoothingRadius;
-                                        densities[i] += weight * weight * weight;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Scale density
-                densities[i] *= params.targetDensity;
-            }
+            // Optimize: Only calculate for a subset of particles each frame if there are many particles
+            // This works well for visual simulations where perfect physical accuracy isn't critical
+            const densityUpdateStep = params.particleCount > 5000 ? 2 : 1;
             
-            // Calculate pressure and viscosity forces
-            const tempVelocities = new Float32Array(velocities);
-            
-            for (let i = 0; i < params.particleCount; i++) {
+            for (let i = 0; i < params.particleCount; i += densityUpdateStep) {
                 const pos = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
-                const vel = [velocities[i * 3], velocities[i * 3 + 1], velocities[i * 3 + 2]];
                 
-                // Apply gravity
-                vel[1] += params.gravity * deltaTime;
-                
-                const cellX = Math.floor(pos[0] / cellSize);
-                const cellY = Math.floor(pos[1] / cellSize);
-                const cellZ = Math.floor(pos[2] / cellSize);
-                
-                // Calculate pressure and viscosity forces
-                let pressureForceX = 0, pressureForceY = 0, pressureForceZ = 0;
-                let viscosityForceX = 0, viscosityForceY = 0, viscosityForceZ = 0;
-                let surfaceTensionForceX = 0, surfaceTensionForceY = 0, surfaceTensionForceZ = 0;
-                
-                // Check neighboring cells
-                for (let nx = -1; nx <= 1; nx++) {
-                    for (let ny = -1; ny <= 1; ny++) {
-                        for (let nz = -1; nz <= 1; nz++) {
-                            const neighborCellKey = `${cellX + nx},${cellY + ny},${cellZ + nz}`;
-                            const particlesInCell = spatialHash[neighborCellKey];
-                            
-                            if (particlesInCell) {
-                                for (const j of particlesInCell) {
-                                    if (i === j) continue; // Skip self
-                                    
-                                    const otherPos = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
-                                    const otherVel = [velocities[j * 3], velocities[j * 3 + 1], velocities[j * 3 + 2]];
-                                    
-                                    const dx = pos[0] - otherPos[0];
-                                    const dy = pos[1] - otherPos[1];
-                                    const dz = pos[2] - otherPos[2];
-                                    const distSquared = dx * dx + dy * dy + dz * dz;
-                                    
-                                    if (distSquared < params.smoothingRadius * params.smoothingRadius && distSquared > 0.0001) {
-                                        const dist = Math.sqrt(distSquared);
-                                        const direction = [dx / dist, dy / dist, dz / dist];
+                if (rebuildSpatialHash) {
+                    const cellSize = params.smoothingRadius * 2;
+                    const cellX = Math.floor(pos[0] / cellSize);
+                    const cellY = Math.floor(pos[1] / cellSize);
+                    const cellZ = Math.floor(pos[2] / cellSize);
+                    
+                    densities[i] = 0;
+                    
+                    // Check neighboring cells
+                    for (let nx = -1; nx <= 1; nx++) {
+                        for (let ny = -1; ny <= 1; ny++) {
+                            for (let nz = -1; nz <= 1; nz++) {
+                                const neighborCellKey = `${cellX + nx},${cellY + ny},${cellZ + nz}`;
+                                const particlesInCell = spatialHash[neighborCellKey];
+                                
+                                if (particlesInCell) {
+                                    for (const j of particlesInCell) {
+                                        const otherPos = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
+                                        const dx = pos[0] - otherPos[0];
+                                        const dy = pos[1] - otherPos[1];
+                                        const dz = pos[2] - otherPos[2];
+                                        const distSquared = dx * dx + dy * dy + dz * dz;
                                         
-                                        // Pressure force - improved formulation for stability
-                                        const pressure = (densities[i] + densities[j] - 2 * params.targetDensity) * params.pressureMultiplier;
-                                        const kernelValue = 1 - dist / params.smoothingRadius;
-                                        const pressureWeight = kernelValue * kernelValue * pressure / (densities[i] + densities[j]) * 0.5;
-                                        
-                                        pressureForceX += direction[0] * pressureWeight;
-                                        pressureForceY += direction[1] * pressureWeight;
-                                        pressureForceZ += direction[2] * pressureWeight;
-                                        
-                                        // Viscosity force - dampens relative motion
-                                        const viscosityWeight = kernelValue * params.viscosity;
-                                        
-                                        viscosityForceX += (otherVel[0] - vel[0]) * viscosityWeight;
-                                        viscosityForceY += (otherVel[1] - vel[1]) * viscosityWeight;
-                                        viscosityForceZ += (otherVel[2] - vel[2]) * viscosityWeight;
-                                        
-                                        // Surface tension - keeps particles together
-                                        if (params.surfaceTension > 0) {
-                                            const tensionWeight = kernelValue * kernelValue * kernelValue * params.surfaceTension;
-                                            
-                                            surfaceTensionForceX -= direction[0] * tensionWeight;
-                                            surfaceTensionForceY -= direction[1] * tensionWeight;
-                                            surfaceTensionForceZ -= direction[2] * tensionWeight;
+                                        if (distSquared < params.smoothingRadius * params.smoothingRadius) {
+                                            const dist = Math.sqrt(distSquared);
+                                            const weight = 1 - dist / params.smoothingRadius;
+                                            densities[i] += weight * weight * weight;
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                    
+                    // Scale density
+                    densities[i] *= params.targetDensity;
                 }
                 
-                // Update velocity based on forces
-                tempVelocities[i * 3] += (pressureForceX + viscosityForceX + surfaceTensionForceX) * deltaTime;
-                tempVelocities[i * 3 + 1] += (pressureForceY + viscosityForceY + surfaceTensionForceY) * deltaTime;
-                tempVelocities[i * 3 + 2] += (pressureForceZ + viscosityForceZ + surfaceTensionForceZ) * deltaTime;
-                
-                // Check for collision with loaded model
-                const collision = checkModelCollision(pos, params.smoothingRadius * 0.5);
-                if (collision) {
-                    // Get direction from collision point to particle
-                    const normal = collision.normal.clone();
-                    
-                    // Reflect velocity along normal direction
-                    const vel3 = new THREE.Vector3(tempVelocities[i * 3], tempVelocities[i * 3 + 1], tempVelocities[i * 3 + 2]);
-                    const normalComponent = vel3.dot(normal);
-                    
-                    if (normalComponent < 0) {
-                        // Reflect with damping
-                        vel3.sub(normal.multiplyScalar(normalComponent * 2 * params.collisionDamping));
-                        
-                        // Apply the reflected velocity
-                        tempVelocities[i * 3] = vel3.x;
-                        tempVelocities[i * 3 + 1] = vel3.y;
-                        tempVelocities[i * 3 + 2] = vel3.z;
-                        
-                        // Move particle away from collision to prevent sticking
-                        pos[0] += normal.x * params.smoothingRadius * 0.1;
-                        pos[1] += normal.y * params.smoothingRadius * 0.1;
-                        pos[2] += normal.z * params.smoothingRadius * 0.1;
-                        
-                        // Apply force to the model if it exists
-                        if (loadedModel) {
-                            // Scale factor for model mass
-                            const forceFactor = 0.002;
-                            
-                            // Apply force in opposite direction to the normal
-                            loadedModel.userData.velocity.x -= normal.x * forceFactor * Math.abs(vel3.x);
-                            loadedModel.userData.velocity.y -= normal.y * forceFactor * Math.abs(vel3.y);
-                            loadedModel.userData.velocity.z -= normal.z * forceFactor * Math.abs(vel3.z);
-                            
-                            // Apply torque (approximate)
-                            const collisionPoint = collision.point.clone();
-                            const modelCenter = loadedModel.position.clone();
-                            const torqueDir = new THREE.Vector3().crossVectors(
-                                collisionPoint.sub(modelCenter),
-                                normal
-                            ).normalize().multiplyScalar(0.0005);
-                            
-                            loadedModel.userData.angularVelocity.add(torqueDir);
-                        }
+                // For particles we skipped, copy density from a neighbor
+                if (densityUpdateStep > 1 && i + 1 < params.particleCount) {
+                    for (let j = 1; j < densityUpdateStep && i + j < params.particleCount; j++) {
+                        densities[i + j] = densities[i];
                     }
                 }
+            }
+            
+            // Calculate pressure and viscosity forces
+            const tempVelocities = new Float32Array(velocities);
+            
+            // Process particles in batches to improve performance
+            const updateBatchSize = 300; // Adjust based on performance testing
+            const batches = Math.ceil(params.particleCount / updateBatchSize);
+            
+            for (let batch = 0; batch < batches; batch++) {
+                const startIdx = batch * updateBatchSize;
+                const endIdx = Math.min((batch + 1) * updateBatchSize, params.particleCount);
                 
-                // Handle collisions with container bounds
-                const halfSize = params.boundSize / 2;
-                
-                if (pos[0] < -halfSize) {
-                    pos[0] = -halfSize + 0.01;
-                    tempVelocities[i * 3] *= -params.collisionDamping;
-                } else if (pos[0] > halfSize) {
-                    pos[0] = halfSize - 0.01;
-                    tempVelocities[i * 3] *= -params.collisionDamping;
-                }
-                
-                if (pos[1] < -halfSize) {
-                    pos[1] = -halfSize + 0.01;
-                    tempVelocities[i * 3 + 1] *= -params.collisionDamping;
-                } else if (pos[1] > halfSize) {
-                    pos[1] = halfSize - 0.01;
-                    tempVelocities[i * 3 + 1] *= -params.collisionDamping;
-                }
-                
-                if (pos[2] < -halfSize) {
-                    pos[2] = -halfSize + 0.01;
-                    tempVelocities[i * 3 + 2] *= -params.collisionDamping;
-                } else if (pos[2] > halfSize) {
-                    pos[2] = halfSize - 0.01;
-                    tempVelocities[i * 3 + 2] *= -params.collisionDamping;
-                }
-                
-                // Special case for fire mode - recycle particles that reach the bottom
-                if (params.fluidMode === 'fire' && pos[1] < -halfSize * 0.8) {
-                    // Reset position to bottom center
-                    pos[0] = (Math.random() - 0.5) * halfSize * 0.5;
-                    pos[1] = -halfSize + 0.05;
-                    pos[2] = (Math.random() - 0.5) * halfSize * 0.5;
+                for (let i = startIdx; i < endIdx; i++) {
+                    const pos = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
+                    const vel = [velocities[i * 3], velocities[i * 3 + 1], velocities[i * 3 + 2]];
                     
-                    // Reset upward velocity
-                    tempVelocities[i * 3] = (Math.random() - 0.5) * 2;
-                    tempVelocities[i * 3 + 1] = Math.random() * 5 + 2;
-                    tempVelocities[i * 3 + 2] = (Math.random() - 0.5) * 2;
+                    // Apply gravity
+                    vel[1] += params.gravity * deltaTime;
+                    
+                    if (rebuildSpatialHash) {
+                        const cellSize = params.smoothingRadius * 2;
+                        const cellX = Math.floor(pos[0] / cellSize);
+                        const cellY = Math.floor(pos[1] / cellSize);
+                        const cellZ = Math.floor(pos[2] / cellSize);
+                        
+                        // Calculate pressure and viscosity forces
+                        let pressureForceX = 0, pressureForceY = 0, pressureForceZ = 0;
+                        let viscosityForceX = 0, viscosityForceY = 0, viscosityForceZ = 0;
+                        let surfaceTensionForceX = 0, surfaceTensionForceY = 0, surfaceTensionForceZ = 0;
+                        
+                        // Check neighboring cells
+                        for (let nx = -1; nx <= 1; nx++) {
+                            for (let ny = -1; ny <= 1; ny++) {
+                                for (let nz = -1; nz <= 1; nz++) {
+                                    const neighborCellKey = `${cellX + nx},${cellY + ny},${cellZ + nz}`;
+                                    const particlesInCell = spatialHash[neighborCellKey];
+                                    
+                                    if (particlesInCell) {
+                                        for (const j of particlesInCell) {
+                                            if (i === j) continue; // Skip self
+                                            
+                                            const otherPos = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
+                                            const otherVel = [velocities[j * 3], velocities[j * 3 + 1], velocities[j * 3 + 2]];
+                                            
+                                            const dx = pos[0] - otherPos[0];
+                                            const dy = pos[1] - otherPos[1];
+                                            const dz = pos[2] - otherPos[2];
+                                            const distSquared = dx * dx + dy * dy + dz * dz;
+                                            
+                                            if (distSquared < params.smoothingRadius * params.smoothingRadius && distSquared > 0.0001) {
+                                                const dist = Math.sqrt(distSquared);
+                                                const direction = [dx / dist, dy / dist, dz / dist];
+                                                
+                                                // Pressure force - improved formulation for stability
+                                                const pressure = (densities[i] + densities[j] - 2 * params.targetDensity) * params.pressureMultiplier;
+                                                const kernelValue = 1 - dist / params.smoothingRadius;
+                                                const pressureWeight = kernelValue * kernelValue * pressure / (densities[i] + densities[j]) * 0.5;
+                                                
+                                                pressureForceX += direction[0] * pressureWeight;
+                                                pressureForceY += direction[1] * pressureWeight;
+                                                pressureForceZ += direction[2] * pressureWeight;
+                                                
+                                                // Viscosity force - dampens relative motion
+                                                const viscosityWeight = kernelValue * params.viscosity;
+                                                
+                                                viscosityForceX += (otherVel[0] - vel[0]) * viscosityWeight;
+                                                viscosityForceY += (otherVel[1] - vel[1]) * viscosityWeight;
+                                                viscosityForceZ += (otherVel[2] - vel[2]) * viscosityWeight;
+                                                
+                                                // Surface tension - keeps particles together
+                                                if (params.surfaceTension > 0) {
+                                                    const tensionWeight = kernelValue * kernelValue * kernelValue * params.surfaceTension;
+                                                    
+                                                    surfaceTensionForceX -= direction[0] * tensionWeight;
+                                                    surfaceTensionForceY -= direction[1] * tensionWeight;
+                                                    surfaceTensionForceZ -= direction[2] * tensionWeight;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Update velocity based on forces
+                        tempVelocities[i * 3] += (pressureForceX + viscosityForceX + surfaceTensionForceX) * deltaTime;
+                        tempVelocities[i * 3 + 1] += (pressureForceY + viscosityForceY + surfaceTensionForceY) * deltaTime;
+                        tempVelocities[i * 3 + 2] += (pressureForceZ + viscosityForceZ + surfaceTensionForceZ) * deltaTime;
+                    }
+                    
+                    // Only check collision with model for a subset of particles each frame
+                    // This significantly improves performance while maintaining visual quality
+                    const modelCollisionFrequency = 10; // Check 1 in X particles
+                    if (i % modelCollisionFrequency === 0) {
+                        // Check for collision with loaded model
+                        const collision = checkModelCollision(pos, params.smoothingRadius * 0.5);
+                        if (collision) {
+                            // Get direction from collision point to particle
+                            const normal = collision.normal.clone();
+                            
+                            // Reflect velocity along normal direction
+                            const vel3 = new THREE.Vector3(tempVelocities[i * 3], tempVelocities[i * 3 + 1], tempVelocities[i * 3 + 2]);
+                            const normalComponent = vel3.dot(normal);
+                            
+                            if (normalComponent < 0) {
+                                // Reflect with damping
+                                vel3.sub(normal.multiplyScalar(normalComponent * 2 * params.collisionDamping));
+                                
+                                // Apply the reflected velocity
+                                tempVelocities[i * 3] = vel3.x;
+                                tempVelocities[i * 3 + 1] = vel3.y;
+                                tempVelocities[i * 3 + 2] = vel3.z;
+                                
+                                // Move particle away from collision to prevent sticking
+                                pos[0] += normal.x * params.smoothingRadius * 0.1;
+                                pos[1] += normal.y * params.smoothingRadius * 0.1;
+                                pos[2] += normal.z * params.smoothingRadius * 0.1;
+                                
+                                // Apply force to the model if it exists
+                                if (loadedModel) {
+                                    // Scale factor for model mass
+                                    const forceFactor = 0.002 / modelCollisionFrequency; // Scale down because we're sampling
+                                    
+                                    // Apply force in opposite direction to the normal
+                                    loadedModel.userData.velocity.x -= normal.x * forceFactor * Math.abs(vel3.x);
+                                    loadedModel.userData.velocity.y -= normal.y * forceFactor * Math.abs(vel3.y);
+                                    loadedModel.userData.velocity.z -= normal.z * forceFactor * Math.abs(vel3.z);
+                                    
+                                    // Apply torque (approximate)
+                                    const collisionPoint = collision.point.clone();
+                                    const modelCenter = loadedModel.position.clone();
+                                    const torqueDir = new THREE.Vector3().crossVectors(
+                                        collisionPoint.sub(modelCenter),
+                                        normal
+                                    ).normalize().multiplyScalar(0.0005 / modelCollisionFrequency);
+                                    
+                                    loadedModel.userData.angularVelocity.add(torqueDir);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Handle collisions with container bounds
+                    const halfSize = params.boundSize / 2;
+                    
+                    if (pos[0] < -halfSize) {
+                        pos[0] = -halfSize + 0.01;
+                        tempVelocities[i * 3] *= -params.collisionDamping;
+                    } else if (pos[0] > halfSize) {
+                        pos[0] = halfSize - 0.01;
+                        tempVelocities[i * 3] *= -params.collisionDamping;
+                    }
+                    
+                    if (pos[1] < -halfSize) {
+                        pos[1] = -halfSize + 0.01;
+                        tempVelocities[i * 3 + 1] *= -params.collisionDamping;
+                    } else if (pos[1] > halfSize) {
+                        pos[1] = halfSize - 0.01;
+                        tempVelocities[i * 3 + 1] *= -params.collisionDamping;
+                    }
+                    
+                    if (pos[2] < -halfSize) {
+                        pos[2] = -halfSize + 0.01;
+                        tempVelocities[i * 3 + 2] *= -params.collisionDamping;
+                    } else if (pos[2] > halfSize) {
+                        pos[2] = halfSize - 0.01;
+                        tempVelocities[i * 3 + 2] *= -params.collisionDamping;
+                    }
+                    
+                    // Special case for fire mode - recycle particles that reach the bottom
+                    if (params.fluidMode === 'fire' && pos[1] < -halfSize * 0.8) {
+                        // Reset position to bottom center
+                        pos[0] = (Math.random() - 0.5) * halfSize * 0.5;
+                        pos[1] = -halfSize + 0.05;
+                        pos[2] = (Math.random() - 0.5) * halfSize * 0.5;
+                        
+                        // Reset upward velocity
+                        tempVelocities[i * 3] = (Math.random() - 0.5) * 2;
+                        tempVelocities[i * 3 + 1] = Math.random() * 5 + 2;
+                        tempVelocities[i * 3 + 2] = (Math.random() - 0.5) * 2;
+                    }
                 }
             }
             
