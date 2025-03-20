@@ -353,6 +353,13 @@
     </style>
 </head>
 <body>
+    <button id="pause-button" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">Pause</button>
+
+    <div style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.5); padding: 10px;">
+        <input type="file" id="obj-file" accept=".obj">
+        <button id="load-model">Load Model</button>
+    </div>
+    
     <div class="loading">
         <div class="spinner"></div>
         <div class="loading-text">Initializing fluid simulation...</div>
@@ -539,11 +546,12 @@
         let spatialHash = {};
         let particleColor = new THREE.Color(0xff3d00); // Fire color initially
         let particleMaterial, particleSystem;
-        let isSimulationPaused = false;
         let lastTime = 0;
         let frameCount = 0;
         let fpsUpdateInterval = 1000; // Update FPS every second
         let fpsLastUpdate = 0;
+        let objLoader;
+        let isSimulationPaused = false;
         
         // Initialize the scene
         function init() {
@@ -620,6 +628,9 @@
             // Initialize the particle system
             initParticles(true);
             
+            // Pause Sim
+            document.getElementById('pause-button').addEventListener('click', toggleSimulationPause);
+
             // UI Event listeners
             document.querySelector('.toggle-panel').addEventListener('click', () => {
                 document.querySelector('.sim-controls').classList.toggle('hidden');
@@ -675,6 +686,36 @@
             document.getElementById('preset-honey').addEventListener('click', () => applyPreset('honey'));
             document.getElementById('preset-fire').addEventListener('click', () => applyPreset('fire'));
             document.getElementById('preset-splash').addEventListener('click', () => applyPreset('splash'));
+
+            // Object loading button
+            document.getElementById('load-model').addEventListener('click', function() {
+                const fileInput = document.getElementById('obj-file');
+                if (fileInput.files.length === 0) return;
+                
+                const file = fileInput.files[0];
+                const fileURL = URL.createObjectURL(file);
+                
+                objLoader.load(fileURL, function(object) {
+                    // Scale and position the model
+                    object.scale.set(0.5, 0.5, 0.5);
+                    object.position.set(0, 0, 0);
+                    
+                    // Add basic material
+                    object.traverse(function(child) {
+                        if (child.isMesh) {
+                            child.material = new THREE.MeshPhongMaterial({
+                                color: 0xcccccc
+                            });
+                        }
+                    });
+                    
+                    // Add to scene
+                    scene.add(object);
+                    
+                    // Release URL
+                    URL.revokeObjectURL(fileURL);
+                });
+            });
             
             // Handle window resize
             window.addEventListener('resize', onWindowResize);
@@ -809,9 +850,9 @@
                             this.rotateEnd.set(event.clientX, event.clientY);
                             this.rotateDelta.subVectors(this.rotateEnd, this.rotateStart);
                             
-                            // Rotate
-                            this.rotateLeft(2 * Math.PI * this.rotateDelta.x / this.domElement.clientWidth * this.rotateSpeed);
-                            this.rotateUp(2 * Math.PI * this.rotateDelta.y / this.domElement.clientHeight * this.rotateSpeed);
+                            // Rotate (negative to invert axis)
+                            this.rotateLeft(-2 * Math.PI * this.rotateDelta.x / this.domElement.clientWidth * this.rotateSpeed);
+                            this.rotateUp(-2 * Math.PI * this.rotateDelta.y / this.domElement.clientHeight * this.rotateSpeed);
                             
                             this.rotateStart.copy(this.rotateEnd);
                             this.update();
@@ -1478,16 +1519,18 @@
                 if (isSmoothed && params.renderStyle === 'smooth') {
                     updateSmoothSurface();
                 }
+
+                // Special effects for fire mode
+                if (params.fluidMode === 'fire') {
+                    // Add turbulence to the fire
+                    addFireTurbulence();
+                    
+                    // Adjust color based on height
+                    updateFireColors();
+                }
             }
             
-            // Special effects for fire mode
-            if (params.fluidMode === 'fire') {
-                // Add turbulence to the fire
-                addFireTurbulence();
-                
-                // Adjust color based on height
-                updateFireColors();
-            }
+            
             
             renderer.render(scene, camera);
         }
@@ -1633,7 +1676,13 @@
             particleSystem.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
             particleMaterial.vertexColors = true;
         }
-        
+
+        // Checks if sim is paused
+        function toggleSimulationPause() {
+            isSimulationPaused = !isSimulationPaused;
+        }
+
+
         // Update the SPH simulation
         function updateSimulation(deltaTime) {
             // Clear spatial hash
