@@ -1,0 +1,2482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluid Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #000;
+            --text-light: #fff;
+            --accent-blue: #0070f3;
+            --accent-gradient-start: #0070f3;
+            --accent-gradient-end: #ff4d4d;
+            --card-bg: rgba(23, 23, 23, 0.8);
+            --slider-track: #333;
+            --slider-thumb: #fff;
+            --button-primary: #0070f3;
+            --button-hover: #0060d3;
+            --button-active: #0050c3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .nav a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .nav a:hover {
+            opacity: 1;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--text-light);
+            color: var(--bg-dark);
+            border: none;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--text-light);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .main {
+            position: relative;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sim-controls {
+            position: absolute;
+            bottom: 2rem;
+            right: 2rem;
+            width: 300px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s;
+        }
+
+        .sim-controls.hidden {
+            transform: translateX(calc(100% + 2rem));
+        }
+
+        .toggle-panel {
+            position: absolute;
+            left: -50px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: var(--card-bg);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-divider {
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.1);
+            margin: 1.5rem 0;
+        }
+
+        .control-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .control-value {
+            opacity: 0.7;
+            font-size: 0.8rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            background: var(--slider-track);
+            border-radius: 2px;
+            outline: none;
+            transition: background 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--slider-thumb);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .control-group button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .control-group button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+        }
+
+        .control-group button:active {
+            filter: brightness(0.9);
+            transform: translateY(0);
+        }
+
+        .grid-background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 6rem;
+            left: 2rem;
+            max-width: 500px;
+            z-index: 10;
+        }
+
+        .info-panel h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .info-panel p {
+            opacity: 0.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .preset-btn {
+            padding: 0.4rem 0.8rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .preset-btn.active {
+            background-color: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+        
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .loading-text {
+            margin-top: 2rem;
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-blue);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .performance-stats {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 4px;
+            z-index: 100;
+        }
+        
+        .attribution {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 0.7rem;
+            opacity: 0.6;
+        }
+
+        /* Object upload styling */
+        .model-upload {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+        }
+
+        .file-input-container {
+            position: relative;
+            flex: 1;
+        }
+
+        .file-input-container input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-input-container .file-input-label {
+            display: block;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-input-container input[type="file"]:hover + .file-input-label {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .load-model-btn {
+            padding: 0.5rem 0.75rem;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .load-model-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .load-model-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Control button grid */
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .button-grid button {
+            margin-top: 0;
+        }
+
+        /* Button icons */
+        .button-icon {
+            margin-right: 0.5rem;
+            font-size: 1rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .info-panel {
+                top: 5rem;
+                left: 1rem;
+                right: 1rem;
+                max-width: none;
+            }
+            
+            .info-panel h1 {
+                font-size: 1.8rem;
+            }
+            
+            .sim-controls {
+                bottom: 1rem;
+                right: 1rem;
+                width: calc(100% - 2rem);
+            }
+        }
+        
+        .disintegrate-button {
+            position: relative;
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 1rem;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #ff4d4d, #ff0000);
+            opacity: 0.7;
+            transition: width 0.1s linear;
+        }
+        
+        .disintegrate-button span {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">Initializing fluid simulation...</div>
+    </div>
+
+    <header class="header">
+        <div class="logo">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 19.5H22L12 2Z" fill="white"/>
+            </svg>
+            FluidSim
+        </div>
+        <nav class="nav">
+            <a href="#">Features</a>
+            <a href="#">Documentation</a>
+            <a href="#">About</a>
+        </nav>
+        <div class="actions">
+            <button class="btn btn-secondary">GitHub</button>
+            <button class="btn btn-primary">Download</button>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="grid-background"></div>
+        <canvas id="canvas"></canvas>
+        <div class="performance-stats">FPS: <span id="fps-counter">0</span></div>
+
+        <div class="info-panel">
+            <h1>Fluid Simulation<br>for Interactive Applications</h1>
+            <p>Based on Smoothed Particle Hydrodynamics (SPH), this simulation models realistic fluid dynamics in real-time. Adjust parameters to explore different fluid behaviors and visualization options.</p>
+            <div class="preset-buttons">
+                <button class="preset-btn active" id="preset-water">Water</button>
+                <button class="preset-btn" id="preset-blocks">Block Test</button>
+            </div>
+        </div>
+
+        <div class="sim-controls">
+            <button class="toggle-panel">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15.5 19L8.5 12L15.5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Particles</span>
+                    <span class="control-value" id="particle-count-value">2500</span>
+                </div>
+                <input type="range" id="particle-count" min="500" max="10000" step="500" value="2500">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Fluidity</span>
+                    <span class="control-value" id="fluidity-value">0.99</span>
+                </div>
+                <input type="range" id="fluidity" min="0.5" max="0.99" step="0.01" value="0.99">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Simulation Speed</span>
+                    <span class="control-value" id="speed-value">1.0</span>
+                </div>
+                <input type="range" id="speed" min="0" max="2" step="0.1" value="1.0">
+            </div>
+            
+            <div class="control-divider"></div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Sphere Radius</span>
+                    <span class="control-value" id="radius-value">0.2</span>
+                </div>
+                <input type="range" id="radius" min="0.05" max="0.5" step="0.01" value="0.2">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Render Style</span>
+                </div>
+                <select id="render-style" style="width: 100%; padding: 0.5rem; background: #222; color: white; border: 1px solid #444; border-radius: 4px;">
+                    <option value="points">Points</option>
+                    <option value="metaballs" selected>Metaballs</option>
+                    <option value="surface">Smooth Surface</option>
+                </select>
+            </div>
+
+            <div class="control-divider"></div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>3D Model Import</span>
+                </div>
+                <div class="model-upload">
+                    <div class="file-input-container">
+                        <input type="file" id="obj-file" accept=".obj">
+                        <label for="obj-file" class="file-input-label" id="file-name-display">Choose File</label>
+                    </div>
+                    <button id="load-model" class="load-model-btn" disabled>Load</button>
+                </div>
+            </div>
+
+            <div class="control-divider"></div>
+
+            <div class="control-group">
+                <div class="button-grid">
+                    <button id="reset-sim">
+                        <span class="button-icon">↺</span>Reset
+                    </button>
+                    <button id="pause-button">
+                        <span class="button-icon" id="pause-icon">⏸️</span><span id="pause-text">Pause</span>
+                    </button>
+                    <button id="drop-particles" style="grid-column: span 2;">
+                        <span class="button-icon">↓</span>Drop Particles
+                    </button>
+                </div>
+            </div>
+            
+            <button id="disintegrate-button" class="disintegrate-button">
+                <div class="progress-bar"></div>
+                <span>Disintegrate Object</span>
+            </button>
+        </div>
+        
+        <div class="attribution">
+            Based on research from Matthias Müller, David Charypar and Markus Gross
+        </div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/OBJLoader.js"></script>
+    <script>
+        // Main simulation parameters
+        const params = {
+            particleCount: 2500,
+            flipness: 0.99,        // FLIP mixing parameter (0 = PIC, 1 = FLIP)
+            sphereRadius: 0.2,     // Visual radius of the particles
+            renderStyle: 'metaballs',
+            timeScale: 1.0,
+            particlesWidth: 0,     // Will be calculated based on particle count
+            particlesHeight: 0,    // Will be calculated based on particle count
+            
+            // Grid parameters
+            gridWidth: 40,
+            gridHeight: 20,
+            gridDepth: 20,
+            gridResolutionX: 64,
+            gridResolutionY: 32,
+            gridResolutionZ: 32,
+            particleDensity: 8     // Target number of particles per cell
+        };
+        
+        // Global variables
+        let scene, camera, renderer, controls;
+        let container, clock;
+        let isSimulationPaused = false;
+        let lastTime = 0;
+        let frameCount = 0;
+        let fpsUpdateInterval = 1000; // Update FPS every second
+        let fpsLastUpdate = 0;
+        let loadedModel = null;
+        let modelMeshes = [];
+        let raycaster, mouse;
+        let isDragging = false;
+        let selectedObject = null;
+        let dragOffset = new THREE.Vector3();
+        
+        // Simulation specific variables
+        let particleSystem;
+        let particleMaterial;
+        let particlePositions;
+        let particleVelocities;
+        
+        // Grid-based solver variables
+        let velocityTexture, tempVelocityTexture, weightTexture;
+        let markerTexture, pressureTexture, divergenceTexture;
+        let originalVelocityTexture;
+        
+        // WebGL specific variables for simulation
+        let simulationFramebuffer;
+        let simulationPrograms = {};
+        
+        // Initialize the scene
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 60);
+            camera.lookAt(0, 0, 0);
+            
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: document.getElementById('canvas'), 
+                antialias: true,
+                alpha: true,
+                preserveDrawingBuffer: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            
+            // Setup raycaster and mouse for object interaction
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            
+            // Create orbit controls
+            controls = setupOrbitControls();
+            
+            // Add camera controls
+            controls = new controls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.rotateSpeed = 0.7;
+            controls.zoomSpeed = 1.2;
+            controls.panSpeed = 0.8;
+            controls.minDistance = 20;
+            controls.maxDistance = 100;
+            controls.target.set(0, 0, 0);
+            
+            // Clock for time-based animations
+            clock = new THREE.Clock();
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            
+            // Add intense directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            // Add a bright point light in the top corner
+            const cornerLight = new THREE.PointLight(0xffffff, 5.0, 50);
+            cornerLight.position.set(params.gridWidth/2 + 3, params.gridHeight/2 + 3, params.gridDepth/2 + 3);
+            scene.add(cornerLight);
+            
+            // Add a colored point light for highlighting
+            const pointLight = new THREE.PointLight(0x2389da, 2.5, 60);
+            pointLight.position.set(0, params.gridHeight/2 + 2, 0);
+            scene.add(pointLight);
+            
+            // Container for the simulation (visible bounds)
+            container = new THREE.BoxHelper(
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(params.gridWidth, params.gridHeight, params.gridDepth),
+                    new THREE.MeshBasicMaterial()
+                )
+            );
+            container.material.color.set(0x333333);
+            // Center the container at origin
+            container.position.set(0, 0, 0);
+            scene.add(container);
+            
+            // Initialize WebGL for simulation
+            initSimulationWebGL();
+            
+            // Initialize the particle system
+            initParticleSystem();
+            
+            // Initialize event listeners
+            initEventListeners();
+            
+            // Remove loading screen after initialization
+            setTimeout(() => {
+                document.querySelector('.loading').style.opacity = 0;
+                setTimeout(() => {
+                    document.querySelector('.loading').style.display = 'none';
+                }, 1000);
+            }, 1500);
+            
+            // Create the disintegration feature
+            setupDisintegration();
+            
+            // Start animation loop
+            animate();
+        }
+
+        // Set up orbit controls
+        function setupOrbitControls() {
+            // Basic OrbitControls implementation
+            return function(object, domElement) {
+                this.object = object;
+                this.domElement = domElement;
+                
+                // API
+                this.enabled = true;
+                this.target = new THREE.Vector3();
+                
+                this.minDistance = 0;
+                this.maxDistance = Infinity;
+                
+                this.enableDamping = false;
+                this.dampingFactor = 0.05;
+                
+                this.enableZoom = true;
+                this.zoomSpeed = 1.0;
+                
+                this.enableRotate = true;
+                this.rotateSpeed = 1.0;
+                
+                // Internals
+                const scope = this;
+                const STATE = { NONE: -1, ROTATE: 0, DOLLY: 1, PAN: 2 };
+                let state = STATE.NONE;
+                
+                const EPS = 0.000001;
+                const rotateStart = new THREE.Vector2();
+                const rotateEnd = new THREE.Vector2();
+                const rotateDelta = new THREE.Vector2();
+                
+                const spherical = new THREE.Spherical();
+                const sphericalDelta = new THREE.Spherical();
+                
+                let scale = 1;
+                const panOffset = new THREE.Vector3();
+                let zoomChanged = false;
+                
+                // Event listeners
+                const changeEvent = { type: 'change' };
+                
+                function getAutoRotationAngle() {
+                    return 2 * Math.PI / 60 / 60 * scope.autoRotateSpeed;
+                }
+                
+                function getZoomScale() {
+                    return Math.pow(0.95, scope.zoomSpeed);
+                }
+                
+                function rotateLeft(angle) {
+                    sphericalDelta.theta -= angle;
+                }
+                
+                function rotateUp(angle) {
+                    sphericalDelta.phi -= angle;
+                }
+                
+                function dollyIn(dollyScale) {
+                    scale /= dollyScale;
+                }
+                
+                function dollyOut(dollyScale) {
+                    scale *= dollyScale;
+                }
+                
+                function update() {
+                    const offset = new THREE.Vector3();
+                    const quat = new THREE.Quaternion().setFromUnitVectors(object.up, new THREE.Vector3(0, 1, 0));
+                    const quatInverse = quat.clone().invert();
+                    
+                    return function update() {
+                        const position = scope.object.position;
+                        
+                        offset.copy(position).sub(scope.target);
+                        
+                        // Rotate offset to "y-axis-is-up" space
+                        offset.applyQuaternion(quat);
+                        
+                        // Angle from z-axis around y-axis
+                        spherical.setFromVector3(offset);
+                        
+                        if (scope.enableDamping) {
+                            spherical.theta += sphericalDelta.theta * scope.dampingFactor;
+                            spherical.phi += sphericalDelta.phi * scope.dampingFactor;
+                        } else {
+                            spherical.theta += sphericalDelta.theta;
+                            spherical.phi += sphericalDelta.phi;
+                        }
+                        
+                        // Restrict phi to be between desired limits
+                        spherical.phi = Math.max(0, Math.min(Math.PI, spherical.phi));
+                        spherical.makeSafe();
+                        
+                        spherical.radius *= scale;
+                        
+                        // Restrict radius to be between desired limits
+                        spherical.radius = Math.max(scope.minDistance, Math.min(scope.maxDistance, spherical.radius));
+                        
+                        // Move target to panned location
+                        scope.target.add(panOffset);
+                        
+                        offset.setFromSpherical(spherical);
+                        
+                        // Rotate offset back to "camera-up-vector-is-up" space
+                        offset.applyQuaternion(quatInverse);
+                        
+                        position.copy(scope.target).add(offset);
+                        
+                        scope.object.lookAt(scope.target);
+                        
+                        if (scope.enableDamping) {
+                            sphericalDelta.theta *= (1 - scope.dampingFactor);
+                            sphericalDelta.phi *= (1 - scope.dampingFactor);
+                            
+                            panOffset.multiplyScalar(1 - scope.dampingFactor);
+                        } else {
+                            sphericalDelta.set(0, 0, 0);
+                            panOffset.set(0, 0, 0);
+                        }
+                        
+                        scale = 1;
+                        
+                        return zoomChanged;
+                    };
+                }
+                
+                // Event handlers
+                function onMouseDown(event) {
+                    if (!scope.enabled) return;
+                    
+                    event.preventDefault();
+                    
+                    if (event.button === 0) {
+                        if (scope.enableRotate === false) return;
+                        
+                        rotateStart.set(event.clientX, event.clientY);
+                        state = STATE.ROTATE;
+                    } else if (event.button === 1) {
+                        if (scope.enableZoom === false) return;
+                        
+                        state = STATE.DOLLY;
+                    }
+                    
+                    document.addEventListener('mousemove', onMouseMove, false);
+                    document.addEventListener('mouseup', onMouseUp, false);
+                }
+                
+                function onMouseMove(event) {
+                    if (!scope.enabled) return;
+                    
+                    event.preventDefault();
+                    
+                    if (state === STATE.ROTATE) {
+                        if (scope.enableRotate === false) return;
+                        
+                        rotateEnd.set(event.clientX, event.clientY);
+                        rotateDelta.subVectors(rotateEnd, rotateStart);
+                        
+                        // Rotating across whole screen goes 360 degrees around
+                        const element = scope.domElement;
+                        rotateLeft(2 * Math.PI * rotateDelta.x / element.clientWidth * scope.rotateSpeed);
+                        rotateUp(2 * Math.PI * rotateDelta.y / element.clientHeight * scope.rotateSpeed);
+                        
+                        rotateStart.copy(rotateEnd);
+                    } else if (state === STATE.DOLLY) {
+                        if (scope.enableZoom === false) return;
+                        
+                        // Not implemented yet
+                    }
+                }
+                
+                function onMouseUp() {
+                    if (!scope.enabled) return;
+                    
+                    document.removeEventListener('mousemove', onMouseMove, false);
+                    document.removeEventListener('mouseup', onMouseUp, false);
+                    
+                    state = STATE.NONE;
+                }
+                
+                function onMouseWheel(event) {
+                    if (!scope.enabled || scope.enableZoom === false || state !== STATE.NONE) return;
+                    
+                    event.preventDefault();
+                    
+                    if (event.deltaY < 0) {
+                        dollyOut(getZoomScale());
+                    } else if (event.deltaY > 0) {
+                        dollyIn(getZoomScale());
+                    }
+                    
+                    zoomChanged = true;
+                }
+                
+                // Bind event handlers
+                domElement.addEventListener('contextmenu', function(event) { event.preventDefault(); }, false);
+                domElement.addEventListener('mousedown', onMouseDown, false);
+                domElement.addEventListener('wheel', onMouseWheel, { passive: false });
+                
+                // API
+                this.update = update;
+                
+                // Initialize
+                this.update();
+            };
+        }
+        
+        // Initialize particle system
+        function initParticleSystem() {
+            // Calculate particles dimensions based on count
+            // Try to keep width and height similar
+            const aspectRatio = 1;
+            params.particlesWidth = Math.ceil(Math.sqrt(params.particleCount * aspectRatio));
+            params.particlesHeight = Math.ceil(params.particleCount / params.particlesWidth);
+            
+            // Create particle geometry
+            const geometry = new THREE.BufferGeometry();
+            
+            // Generate particle positions
+            particlePositions = new Float32Array(params.particlesWidth * params.particlesHeight * 4);
+            particleVelocities = new Float32Array(params.particlesWidth * params.particlesHeight * 4);
+            
+            // Initialize particles in a cube formation inside the grid
+            initializeBlockMode();
+            
+            // Create position attribute for Three.js
+            const positions = new Float32Array(params.particleCount * 3);
+            for (let i = 0; i < params.particleCount; i++) {
+                positions[i * 3] = particlePositions[i * 4];
+                positions[i * 3 + 1] = particlePositions[i * 4 + 1];
+                positions[i * 3 + 2] = particlePositions[i * 4 + 2];
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            // Create material
+            particleMaterial = new THREE.PointsMaterial({
+                color: 0x2389da,
+                size: params.sphereRadius * 2,
+                transparent: true,
+                opacity: 0.6,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                sizeAttenuation: true
+            });
+            
+            // Create particle system
+            particleSystem = new THREE.Points(geometry, particleMaterial);
+            scene.add(particleSystem);
+            
+            // Initialize simulator textures
+            initializeSimulationTextures();
+        }
+        
+        // Initialize grid placement of particles (cube formation)
+        function initializeBlockMode() {
+            // Calculate bounds to center the particles
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            // Size of the block of particles (70% of grid size)
+            const blockWidth = params.gridWidth * 0.7;
+            const blockHeight = params.gridHeight * 0.7;
+            const blockDepth = params.gridDepth * 0.7;
+            
+            // Calculate number of particles per dimension for even distribution
+            const particlesPerDimension = Math.cbrt(params.particleCount);
+            const spacingX = blockWidth / particlesPerDimension;
+            const spacingY = blockHeight / particlesPerDimension;
+            const spacingZ = blockDepth / particlesPerDimension;
+            
+            let particleIndex = 0;
+            for (let x = 0; x < particlesPerDimension && particleIndex < params.particleCount; x++) {
+                for (let y = 0; y < particlesPerDimension && particleIndex < params.particleCount; y++) {
+                    for (let z = 0; z < particlesPerDimension && particleIndex < params.particleCount; z++) {
+                        // Calculate position with slight jitter
+                        const posX = -halfWidth + (x * spacingX) + (blockWidth - particlesPerDimension * spacingX) / 2 + (Math.random() * 0.1 - 0.05);
+                        const posY = -halfHeight + (y * spacingY) + (blockHeight - particlesPerDimension * spacingY) / 2 + (Math.random() * 0.1 - 0.05);
+                        const posZ = -halfDepth + (z * spacingZ) + (blockDepth - particlesPerDimension * spacingZ) / 2 + (Math.random() * 0.1 - 0.05);
+                        
+                        // Set position
+                        particlePositions[particleIndex * 4] = posX;
+                        particlePositions[particleIndex * 4 + 1] = posY;
+                        particlePositions[particleIndex * 4 + 2] = posZ;
+                        particlePositions[particleIndex * 4 + 3] = 0.0; // Not used
+                        
+                        // Initialize velocity
+                        particleVelocities[particleIndex * 4] = 0.0;
+                        particleVelocities[particleIndex * 4 + 1] = 0.0;
+                        particleVelocities[particleIndex * 4 + 2] = 0.0;
+                        particleVelocities[particleIndex * 4 + 3] = 0.0; // Not used
+                        
+                        particleIndex++;
+                    }
+                }
+            }
+        }
+        
+        // Initialize WebGL for simulation
+        function initSimulationWebGL() {
+            // We use the renderer's context
+            const gl = renderer.getContext();
+            
+            // Create framebuffer for simulation
+            simulationFramebuffer = gl.createFramebuffer();
+            
+            // Load shaders and create programs
+            loadSimulationPrograms();
+        }
+        
+        // Load simulation shader programs
+        function loadSimulationPrograms() {
+            // This is where we would normally load shaders from files
+            // For simplicity in this standalone HTML, we'll define them inline
+            
+            // Basic vertex shader for full-screen quad
+            const fullscreenVertShader = `
+                attribute vec2 a_position;
+                varying vec2 v_texCoord;
+                
+                void main() {
+                    v_texCoord = a_position * 0.5 + 0.5;
+                    gl_Position = vec4(a_position, 0.0, 1.0);
+                }
+            `;
+            
+            // Transfer to grid fragment shader
+            const transferToGridFragShader = `
+                precision highp float;
+                
+                uniform sampler2D u_positionTexture;
+                uniform sampler2D u_velocityTexture;
+                uniform vec3 u_gridResolution;
+                uniform vec3 u_gridSize;
+                uniform int u_accumulate;
+                uniform float u_zOffset;
+                
+                varying vec2 v_texCoord;
+                
+                void main() {
+                    vec4 position = texture2D(u_positionTexture, v_texCoord);
+                    vec4 velocity = texture2D(u_velocityTexture, v_texCoord);
+                    
+                    // Add z offset for splat
+                    float z = position.z + u_zOffset;
+                    
+                    // Convert world position to grid space
+                    vec3 gridPos = vec3(
+                        (position.x + u_gridSize.x/2.0) / u_gridSize.x * u_gridResolution.x,
+                        (position.y + u_gridSize.y/2.0) / u_gridSize.y * u_gridResolution.y,
+                        (z + u_gridSize.z/2.0) / u_gridSize.z * u_gridResolution.z
+                    );
+                    
+                    // Sample weight based on distance
+                    float weight = 1.0 - length(v_texCoord - vec2(0.5)) * 2.0;
+                    weight = max(0.0, weight);
+                    
+                    if (u_accumulate == 0) {
+                        // Accumulate weight
+                        gl_FragColor = vec4(weight, weight, weight, weight);
+                    } else {
+                        // Accumulate weighted velocity
+                        gl_FragColor = velocity * weight;
+                    }
+                }
+            `;
+            
+            // Create programs object
+            simulationPrograms = {
+                // We would create all needed programs here
+                transferToGrid: createProgram(fullscreenVertShader, transferToGridFragShader)
+            };
+            
+            // Create other program shaders here...
+        }
+        
+        // Helper to create WebGL program from shaders
+        function createProgram(vertexShaderSource, fragmentShaderSource) {
+            const gl = renderer.getContext();
+            
+            // Create shaders
+            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vertexShaderSource);
+            gl.compileShader(vertexShader);
+            
+            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fragmentShaderSource);
+            gl.compileShader(fragmentShader);
+            
+            // Create program and attach shaders
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            
+            // Check for errors
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Failed to link program:', gl.getProgramInfoLog(program));
+                gl.deleteProgram(program);
+                return null;
+            }
+            
+            return program;
+        }
+        
+        // Initialize simulation textures
+        function initializeSimulationTextures() {
+            // In a full implementation, we would create the following textures:
+            // 1. Velocity texture (for MAC grid)
+            // 2. Weight texture
+            // 3. Marker texture (fluid/air)
+            // 4. Pressure texture
+            // 5. Divergence texture
+            
+            // For this simplified version, we'll just create placeholder textures
+            // and implement the core simulation steps
+        }
+        
+        // Initialize event listeners
+        function initEventListeners() {
+            // UI Event listeners
+            document.querySelector('.toggle-panel').addEventListener('click', () => {
+                document.querySelector('.sim-controls').classList.toggle('hidden');
+            });
+            
+            document.getElementById('particle-count').addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                document.getElementById('particle-count-value').textContent = value;
+                params.particleCount = value;
+            });
+            
+            document.getElementById('fluidity').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('fluidity-value').textContent = value.toFixed(2);
+                params.flipness = value;
+            });
+            
+            document.getElementById('speed').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('speed-value').textContent = value.toFixed(1);
+                params.timeScale = value;
+            });
+            
+            document.getElementById('radius').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('radius-value').textContent = value.toFixed(2);
+                params.sphereRadius = value;
+                
+                // Update particle size
+                if (particleMaterial) {
+                    particleMaterial.size = params.sphereRadius * 2;
+                }
+            });
+            
+            document.getElementById('render-style').addEventListener('change', (e) => {
+                params.renderStyle = e.target.value;
+                updateRenderStyle();
+            });
+            
+            document.getElementById('reset-sim').addEventListener('click', resetSimulation);
+            document.getElementById('drop-particles').addEventListener('click', dropParticleBlock);
+            
+            // Pause button event listener
+            document.getElementById('pause-button').addEventListener('click', toggleSimulationPause);
+            
+            // File input event listener
+            const fileInput = document.getElementById('obj-file');
+            fileInput.addEventListener('change', function(e) {
+                const fileName = e.target.files[0] ? e.target.files[0].name : 'Choose File';
+                document.getElementById('file-name-display').textContent = fileName;
+                
+                // Enable or disable the load button
+                document.getElementById('load-model').disabled = !e.target.files[0];
+            });
+            
+            // Load model button event listener
+            document.getElementById('load-model').addEventListener('click', function() {
+                const fileInput = document.getElementById('obj-file');
+                if (fileInput.files.length === 0) return;
+                
+                loadOBJModel(fileInput.files[0]);
+            });
+            
+            // Preset buttons
+            document.getElementById('preset-water').addEventListener('click', () => applyPreset('water'));
+            document.getElementById('preset-blocks').addEventListener('click', () => applyPreset('blocks'));
+            
+            // Window resize event
+            window.addEventListener('resize', onWindowResize);
+            
+            // Mouse events for model interaction
+            renderer.domElement.addEventListener('mousedown', onMouseDown);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('mouseup', onMouseUp);
+            
+            // Keyboard events
+            window.addEventListener('keydown', (event) => {
+                if (event.key === ' ') {
+                    toggleSimulationPause();
+                }
+                if (event.key === 'r') {
+                    resetSimulation();
+                }
+                if (event.key === 'd') {
+                    dropParticleBlock();
+                }
+            });
+        }
+        
+        // Set up disintegration feature
+        function setupDisintegration() {
+            let disintegrateProgress = 0;
+            let isDisintegrating = false;
+            let disintegrateInterval = null;
+            const maxDisintegrateTime = 3000; // 3 seconds to disintegrate
+            const progressBar = document.querySelector('.progress-bar');
+            const disintegrateButton = document.getElementById('disintegrate-button');
+            
+            // Disintegrate button events
+            disintegrateButton.addEventListener('mousedown', function() {
+                if (!loadedModel) return;
+                
+                isDisintegrating = true;
+                disintegrateProgress = 0;
+                
+                // Start progress
+                disintegrateInterval = setInterval(function() {
+                    disintegrateProgress += 10;
+                    const percent = Math.min(100, (disintegrateProgress / maxDisintegrateTime) * 100);
+                    progressBar.style.width = percent + '%';
+                    
+                    // Make the model glow
+                    if (loadedModel) {
+                        // Apply glow to all meshes
+                        loadedModel.traverse(function(child) {
+                            if (child.isMesh) {
+                                // Increase emission/glow intensity
+                                if (!child.material.userData.originalColor) {
+                                    child.material.userData.originalColor = child.material.color.clone();
+                                }
+                                
+                                // Transition from original color to bright red/orange
+                                const glowIntensity = percent / 100;
+                                const color = new THREE.Color().lerpColors(
+                                    child.material.userData.originalColor,
+                                    new THREE.Color(1, 0.3, 0),
+                                    glowIntensity
+                                );
+                                
+                                child.material.color.copy(color);
+                                child.material.emissive = new THREE.Color(color.r * glowIntensity, 
+                                                                        color.g * glowIntensity * 0.3, 
+                                                                        0);
+                                
+                                // Make it more transparent when close to disintegration
+                                if (percent > 80) {
+                                    child.material.opacity = 1 - ((percent - 80) / 20);
+                                }
+                            }
+                        });
+                        
+                        // Add particle effects when close to disintegration
+                        if (percent > 80) {
+                            const particleCount = Math.floor((percent - 80) / 5);
+                            spawnDisintegrationParticles(particleCount);
+                        }
+                    }
+                    
+                    // Check if disintegration is complete
+                    if (disintegrateProgress >= maxDisintegrateTime) {
+                        clearInterval(disintegrateInterval);
+                        disintegrateInterval = null;
+                        isDisintegrating = false;
+                        
+                        // Disintegrate the model with explosion
+                        if (loadedModel) {
+                            // Create explosion effect
+                            createExplosionEffect(loadedModel);
+                            
+                            // Then remove the model
+                            scene.remove(loadedModel);
+                            loadedModel = null;
+                            modelMeshes = [];
+                            progressBar.style.width = '0%';
+                        }
+                    }
+                }, 10);
+            });
+            
+            // Cancel disintegration when mouse is released
+            disintegrateButton.addEventListener('mouseup', cancelDisintegration);
+            disintegrateButton.addEventListener('mouseleave', cancelDisintegration);
+            
+            function cancelDisintegration() {
+                if (!isDisintegrating) return;
+                
+                isDisintegrating = false;
+                clearInterval(disintegrateInterval);
+                
+                // Animate the progress bar back to 0
+                const initialProgress = disintegrateProgress;
+                const reverseStartTime = Date.now();
+                const reverseDuration = 1000; // 1 second to reverse
+                
+                const reverseProgress = setInterval(function() {
+                    const elapsed = Date.now() - reverseStartTime;
+                    const t = Math.min(1, elapsed / reverseDuration);
+                    
+                    // Easing function for smooth reversal
+                    const easeOut = 1 - Math.pow(1 - t, 2);
+                    
+                    disintegrateProgress = initialProgress * (1 - easeOut);
+                    
+                    if (disintegrateProgress <= 0 || t >= 1) {
+                        disintegrateProgress = 0;
+                        clearInterval(reverseProgress);
+                        progressBar.style.width = '0%';
+                        
+                        // Reset model appearance
+                        if (loadedModel) {
+                            loadedModel.traverse(function(child) {
+                                if (child.isMesh && child.material.userData.originalColor) {
+                                    child.material.color.copy(child.material.userData.originalColor);
+                                    child.material.emissive = new THREE.Color(0, 0, 0);
+                                    child.material.opacity = 0.7;
+                                }
+                            });
+                        }
+                    } else {
+                        const percent = (disintegrateProgress / maxDisintegrateTime) * 100;
+                        progressBar.style.width = percent + '%';
+                        
+                        // Update model glow to match progress
+                        if (loadedModel) {
+                            loadedModel.traverse(function(child) {
+                                if (child.isMesh && child.material.userData.originalColor) {
+                                    // Calculate glowIntensity based on current progress
+                                    const glowIntensity = percent / 100;
+                                    
+                                    // Smoothly transition color back to original
+                                    const color = new THREE.Color().lerpColors(
+                                        child.material.userData.originalColor,
+                                        new THREE.Color(1, 0.3, 0),
+                                        glowIntensity
+                                    );
+                                    
+                                    child.material.color.copy(color);
+                                    child.material.emissive = new THREE.Color(
+                                        color.r * glowIntensity, 
+                                        color.g * glowIntensity * 0.3, 
+                                        0
+                                    );
+                                    
+                                    // Restore opacity
+                                    child.material.opacity = 0.7;
+                                }
+                            });
+                        }
+                    }
+                }, 16); // 60fps
+            }
+        }
+        
+        // Create explosion effect for disintegration
+        function createExplosionEffect(model) {
+            // Store the model's position and size before removing it
+            const modelPosition = model.position.clone();
+            const boundingBox = new THREE.Box3().setFromObject(model);
+            const modelSize = new THREE.Vector3();
+            boundingBox.getSize(modelSize);
+            
+            // Create explosion particles
+            const explosionParticleCount = 150;
+            const explosionRadius = Math.max(modelSize.x, modelSize.y, modelSize.z) / 2;
+            
+            // Determine color from model
+            let explosionColor = new THREE.Color(0xffffff); // Default white
+            
+            model.traverse(function(child) {
+                if (child.isMesh && child.material.userData.originalColor) {
+                    explosionColor = child.material.userData.originalColor;
+                }
+            });
+            
+            // Create explosive particles at the model's position
+            for (let i = 0; i < explosionParticleCount; i++) {
+                // Get a random direction for the particle
+                const phi = Math.random() * Math.PI * 2;
+                const theta = Math.random() * Math.PI;
+                const radius = explosionRadius * (0.3 + Math.random() * 0.7);
+                
+                // Calculate position (spherical coordinates)
+                const x = modelPosition.x + radius * Math.sin(theta) * Math.cos(phi);
+                const y = modelPosition.y + radius * Math.sin(theta) * Math.sin(phi);
+                const z = modelPosition.z + radius * Math.cos(theta);
+                
+                // Create explosion particle
+                createExplosionParticle(
+                    new THREE.Vector3(x, y, z),
+                    new THREE.Vector3(
+                        (x - modelPosition.x) * (0.5 + Math.random() * 0.5) * 0.1,
+                        (y - modelPosition.y) * (0.5 + Math.random() * 0.5) * 0.1,
+                        (z - modelPosition.z) * (0.5 + Math.random() * 0.5) * 0.1
+                    ),
+                    explosionColor
+                );
+            }
+        }
+        
+        // Create a single explosion particle
+        function createExplosionParticle(position, velocity, color) {
+            // Use existing particles from the simulation for the explosion effect
+            const particleIndex = Math.floor(Math.random() * params.particleCount);
+            
+            // Set position
+            particlePositions[particleIndex * 4] = position.x;
+            particlePositions[particleIndex * 4 + 1] = position.y;
+            particlePositions[particleIndex * 4 + 2] = position.z;
+            
+            // Set velocity
+            particleVelocities[particleIndex * 4] = velocity.x * 20;     // Scale for more explosive effect
+            particleVelocities[particleIndex * 4 + 1] = velocity.y * 20;
+            particleVelocities[particleIndex * 4 + 2] = velocity.z * 20;
+            
+            // Update the three.js buffer
+            particleSystem.geometry.attributes.position.array[particleIndex * 3] = position.x;
+            particleSystem.geometry.attributes.position.array[particleIndex * 3 + 1] = position.y;
+            particleSystem.geometry.attributes.position.array[particleIndex * 3 + 2] = position.z;
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // Spawn particles during disintegration
+        function spawnDisintegrationParticles(count) {
+            if (!loadedModel) return;
+            
+            // Get the bounding box of the model
+            const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+            const center = new THREE.Vector3();
+            boundingBox.getCenter(center);
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            
+            // Spawn particles from random points on the model
+            for (let i = 0; i < count; i++) {
+                // Find a random position within the bounding box
+                const x = center.x + (Math.random() - 0.5) * size.x;
+                const y = center.y + (Math.random() - 0.5) * size.y;
+                const z = center.z + (Math.random() - 0.5) * size.z;
+                
+                // Pick a random particle for this effect
+                const particleIndex = Math.floor(Math.random() * params.particleCount);
+                
+                // Set its position to the random location on the model
+                particlePositions[particleIndex * 4] = x;
+                particlePositions[particleIndex * 4 + 1] = y;
+                particlePositions[particleIndex * 4 + 2] = z;
+                
+                // Give it an outward velocity from the center
+                const direction = new THREE.Vector3(x - center.x, y - center.y, z - center.z).normalize();
+                particleVelocities[particleIndex * 4] = direction.x * 10;
+                particleVelocities[particleIndex * 4 + 1] = direction.y * 10;
+                particleVelocities[particleIndex * 4 + 2] = direction.z * 10;
+                
+                // Update the three.js buffer
+                particleSystem.geometry.attributes.position.array[particleIndex * 3] = x;
+                particleSystem.geometry.attributes.position.array[particleIndex * 3 + 1] = y;
+                particleSystem.geometry.attributes.position.array[particleIndex * 3 + 2] = z;
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // Reset the simulation
+        function resetSimulation() {
+            // Re-initialize particles
+            initializeBlockMode();
+            
+            // Update the displayed positions in three.js
+            for (let i = 0; i < params.particleCount; i++) {
+                particleSystem.geometry.attributes.position.array[i * 3] = particlePositions[i * 4];
+                particleSystem.geometry.attributes.position.array[i * 3 + 1] = particlePositions[i * 4 + 1];
+                particleSystem.geometry.attributes.position.array[i * 3 + 2] = particlePositions[i * 4 + 2];
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Drop a block of particles
+        function dropParticleBlock() {
+            // Calculate grid center
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            // Size of the drop block (30% of grid size)
+            const dropSize = params.gridWidth * 0.3;
+            
+            // Number of particles to drop (20% of total)
+            const particlesToDrop = Math.floor(params.particleCount * 0.2);
+            
+            // Select random particles to drop
+            for (let i = 0; i < particlesToDrop; i++) {
+                const idx = Math.floor(Math.random() * params.particleCount);
+                
+                // Set position to top of container with random x,z
+                particlePositions[idx * 4] = (Math.random() - 0.5) * dropSize;
+                particlePositions[idx * 4 + 1] = halfHeight - 1; // Just below the top
+                particlePositions[idx * 4 + 2] = (Math.random() - 0.5) * dropSize;
+                
+                // Add downward velocity
+                particleVelocities[idx * 4] = 0;
+                particleVelocities[idx * 4 + 1] = -5;
+                particleVelocities[idx * 4 + 2] = 0;
+                
+                // Update the three.js buffer
+                particleSystem.geometry.attributes.position.array[idx * 3] = particlePositions[idx * 4];
+                particleSystem.geometry.attributes.position.array[idx * 3 + 1] = particlePositions[idx * 4 + 1];
+                particleSystem.geometry.attributes.position.array[idx * 3 + 2] = particlePositions[idx * 4 + 2];
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Apply a preset
+        function applyPreset(presetName) {
+            // Update active button styling
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`preset-${presetName}`).classList.add('active');
+            
+            if (presetName === 'water') {
+                // Blue water-like fluid
+                particleMaterial.color.set(0x2389da);
+                particleMaterial.size = params.sphereRadius * 2;
+                particleMaterial.opacity = 0.6;
+                
+                // Update sliders
+                document.getElementById('fluidity').value = 0.99;
+                document.getElementById('fluidity-value').textContent = "0.99";
+                params.flipness = 0.99;
+                
+                document.getElementById('speed').value = 1.0;
+                document.getElementById('speed-value').textContent = "1.0";
+                params.timeScale = 1.0;
+            } else if (presetName === 'blocks') {
+                // Cube-like particles
+                particleMaterial.color.set(0xdddddd);
+                particleMaterial.size = params.sphereRadius * 1.5;
+                particleMaterial.opacity = 0.8;
+                
+                // Update sliders
+                document.getElementById('fluidity').value = 0.7;
+                document.getElementById('fluidity-value').textContent = "0.70";
+                params.flipness = 0.7;
+                
+                document.getElementById('speed').value = 0.8;
+                document.getElementById('speed-value').textContent = "0.8";
+                params.timeScale = 0.8;
+            }
+            
+            resetSimulation();
+        }
+        
+        // Update render style
+        function updateRenderStyle() {
+            if (!particleMaterial) return;
+            
+            switch (params.renderStyle) {
+                case 'points':
+                    particleMaterial.size = params.sphereRadius * 1.5;
+                    particleMaterial.opacity = 0.8;
+                    particleMaterial.blending = THREE.NormalBlending;
+                    break;
+                    
+                case 'metaballs':
+                    particleMaterial.size = params.sphereRadius * 2;
+                    particleMaterial.opacity = 0.6;
+                    particleMaterial.blending = THREE.AdditiveBlending;
+                    break;
+                    
+                case 'surface':
+                    particleMaterial.size = params.sphereRadius * 2.2;
+                    particleMaterial.opacity = 0.4;
+                    particleMaterial.blending = THREE.AdditiveBlending;
+                    break;
+            }
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Toggle pause/play simulation
+        function toggleSimulationPause() {
+            isSimulationPaused = !isSimulationPaused;
+            
+            // Update button text
+            const pauseButton = document.getElementById('pause-button');
+            const pauseText = document.getElementById('pause-text');
+            const pauseIcon = document.getElementById('pause-icon');
+            
+            if (isSimulationPaused) {
+                pauseText.textContent = 'Resume';
+                pauseIcon.textContent = '▶️';
+            } else {
+                pauseText.textContent = 'Pause';
+                pauseIcon.textContent = '⏸️';
+            }
+        }
+        
+        // Update FPS counter
+        function updateFPSCounter(now) {
+            frameCount++;
+            
+            if (now - fpsLastUpdate >= fpsUpdateInterval) {
+                const fps = Math.round((frameCount * 1000) / (now - fpsLastUpdate));
+                document.getElementById('fps-counter').textContent = fps;
+                fpsLastUpdate = now;
+                frameCount = 0;
+            }
+        }
+        
+        // Load OBJ Model
+        function loadOBJModel(file) {
+            // Remove existing model if any
+            if (loadedModel) {
+                scene.remove(loadedModel);
+                loadedModel = null;
+                modelMeshes = [];
+            }
+            
+            // Create a file URL
+            const fileURL = URL.createObjectURL(file);
+            
+            // Create OBJ loader
+            const objLoader = new THREE.OBJLoader();
+            
+            // Start loading
+            objLoader.load(
+                fileURL,
+                // onLoad callback
+                function(object) {
+                    // Calculate the bounding box to get dimensions
+                    const boundingBox = new THREE.Box3().setFromObject(object);
+                    const size = new THREE.Vector3();
+                    boundingBox.getSize(size);
+                    
+                    // Find the largest dimension
+                    const maxDimension = Math.max(size.x, size.y, size.z);
+                    
+                    // Calculate scaling factor to make largest dimension half the box width
+                    const targetSize = params.gridWidth / 2.5; // Slightly smaller than half
+                    const scaleFactor = targetSize / maxDimension;
+                    
+                    // Apply scaling
+                    object.scale.set(scaleFactor, scaleFactor, scaleFactor);
+                    object.position.set(0, 0, 0);
+                    
+                    // Initialize physics properties
+                    object.userData = {
+                        velocity: new THREE.Vector3(0, 0, 0),
+                        angularVelocity: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5
+                        ),
+                        isDragging: false,
+                        isDraggable: true,
+                        mass: 1.0,
+                        dragStartRotation: new THREE.Euler()
+                    };
+                    
+                    // Apply materials and store meshes
+                    object.traverse(function(child) {
+                        if (child.isMesh) {
+                            // Apply a standard material
+                            child.material = new THREE.MeshPhongMaterial({
+                                color: 0xcccccc,
+                                transparent: true,
+                                opacity: 0.7,
+                                side: THREE.DoubleSide,
+                                emissive: new THREE.Color(0, 0, 0),
+                                emissiveIntensity: 0
+                            });
+                            
+                            // Store meshes for collision detection
+                            modelMeshes.push({
+                                mesh: child,
+                                geometry: child.geometry,
+                                // Create bounding box for collision detection
+                                boundingBox: new THREE.Box3().setFromObject(child)
+                            });
+                        }
+                    });
+                    
+                    // Add to scene
+                    scene.add(object);
+                    loadedModel = object;
+                    
+                    // Release URL
+                    URL.revokeObjectURL(fileURL);
+                    
+                    console.log('Model loaded successfully', object);
+                },
+                // onProgress callback
+                function(xhr) {
+                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                // onError callback
+                function(error) {
+                    console.error('Error loading model:', error);
+                    URL.revokeObjectURL(fileURL);
+                }
+            );
+        }
+        
+        // Mouse interaction for model dragging
+        function onMouseDown(event) {
+            // Calculate mouse position in normalized device coordinates (-1 to +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Update the picking ray with the camera and mouse position
+            raycaster.setFromCamera(mouse, camera);
+            
+            // If we have a model, check for intersections
+            if (loadedModel) {
+                const intersects = raycaster.intersectObject(loadedModel, true);
+                
+                if (intersects.length > 0) {
+                    // Disable OrbitControls temporarily
+                    controls.enabled = false;
+                    
+                    // Start dragging
+                    isDragging = true;
+                    selectedObject = loadedModel;
+                    
+                    // Calculate the offset
+                    const intersectionPoint = intersects[0].point;
+                    dragOffset.copy(intersectionPoint).sub(loadedModel.position);
+                    
+                    // Store current rotation and physics state
+                    loadedModel.userData.dragStartRotation = loadedModel.rotation.clone();
+                    
+                    // Mark as being dragged
+                    loadedModel.userData.isDragging = true;
+                }
+            }
+        }
+        
+        function onMouseMove(event) {
+            if (isDragging && selectedObject) {
+                // Update mouse position
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Cast a ray from the camera to the mouse position
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Calculate a plane perpendicular to the camera direction
+                const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
+                const plane = new THREE.Plane(planeNormal, -selectedObject.position.z);
+                
+                // Find the point of intersection with the plane
+                const intersection = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersection);
+                
+                // Set object position, accounting for the offset
+                const newPosition = intersection.clone().sub(dragOffset);
+                
+                // Apply new position to object's physics state
+                selectedObject.userData.velocity.copy(newPosition.clone().sub(selectedObject.position).multiplyScalar(20));
+                selectedObject.position.copy(newPosition);
+                
+                // Update bounding boxes for collision
+                updateModelBoundingBoxes();
+            }
+        }
+        
+        function onMouseUp(event) {
+            if (isDragging) {
+                isDragging = false;
+                
+                if (selectedObject) {
+                    // Release the object but keep its momentum
+                    selectedObject.userData.isDragging = false;
+                    selectedObject = null;
+                }
+                
+                // Re-enable OrbitControls
+                controls.enabled = true;
+            }
+        }
+        
+        // Update model bounding boxes
+        function updateModelBoundingBoxes() {
+            if (loadedModel) {
+                modelMeshes = []; // Clear previous meshes
+                loadedModel.traverse(function(child) {
+                    if (child.isMesh) {
+                        const boundingBox = new THREE.Box3().setFromObject(child);
+                        modelMeshes.push({
+                            mesh: child,
+                            geometry: child.geometry,
+                            boundingBox: boundingBox
+                        });
+                    }
+                });
+            }
+        }
+        
+        // Update object physics
+        function updateObjectPhysics(deltaTime) {
+            if (!loadedModel) return;
+            
+            // Apply physics if not being dragged
+            if (!loadedModel.userData.isDragging) {
+                // Apply gravity
+                loadedModel.userData.velocity.y -= 9.8 * deltaTime;
+                
+                // Apply velocity
+                loadedModel.position.add(loadedModel.userData.velocity.clone().multiplyScalar(deltaTime));
+                
+                // Apply angular velocity (rotation)
+                loadedModel.rotation.x += loadedModel.userData.angularVelocity.x * deltaTime;
+                loadedModel.rotation.y += loadedModel.userData.angularVelocity.y * deltaTime;
+                loadedModel.rotation.z += loadedModel.userData.angularVelocity.z * deltaTime;
+                
+                // Check boundary collisions
+                checkModelBoundaryCollision();
+                
+                // Apply damping to velocities
+                loadedModel.userData.velocity.multiplyScalar(0.99);
+                loadedModel.userData.angularVelocity.multiplyScalar(0.99);
+                
+                // Update model bounding boxes for collision
+                updateModelBoundingBoxes();
+            } else {
+                // Even when dragging, still apply rotation based on angular velocity
+                loadedModel.rotation.x += loadedModel.userData.angularVelocity.x * deltaTime * 0.5;
+                loadedModel.rotation.y += loadedModel.userData.angularVelocity.y * deltaTime * 0.5;
+                loadedModel.rotation.z += loadedModel.userData.angularVelocity.z * deltaTime * 0.5;
+            }
+        }
+        
+        // Check for model collisions with boundary
+        function checkModelBoundaryCollision() {
+            if (!loadedModel) return;
+            
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            const center = new THREE.Vector3();
+            boundingBox.getCenter(center);
+            
+            // Collision with X boundaries
+            if (center.x - size.x/2 < -halfWidth) {
+                loadedModel.position.x += (-halfWidth - (center.x - size.x/2));
+                loadedModel.userData.velocity.x *= -0.7; // Bounce with damping
+                // Add spin effect
+                loadedModel.userData.angularVelocity.z -= loadedModel.userData.velocity.y * 0.1;
+            }
+            else if (center.x + size.x/2 > halfWidth) {
+                loadedModel.position.x -= ((center.x + size.x/2) - halfWidth);
+                loadedModel.userData.velocity.x *= -0.7;
+                // Add spin effect
+                loadedModel.userData.angularVelocity.z += loadedModel.userData.velocity.y * 0.1;
+            }
+            
+            // Collision with Y boundaries
+            if (center.y - size.y/2 < -halfHeight) {
+                loadedModel.position.y += (-halfHeight - (center.y - size.y/2));
+                loadedModel.userData.velocity.y *= -0.7;
+                // Add spin based on x velocity
+                loadedModel.userData.angularVelocity.x += loadedModel.userData.velocity.x * 0.1;
+            }
+            else if (center.y + size.y/2 > halfHeight) {
+                loadedModel.position.y -= ((center.y + size.y/2) - halfHeight);
+                loadedModel.userData.velocity.y *= -0.7;
+                // Add spin based on x velocity
+                loadedModel.userData.angularVelocity.x -= loadedModel.userData.velocity.x * 0.1;
+            }
+            
+            // Collision with Z boundaries
+            if (center.z - size.z/2 < -halfDepth) {
+                loadedModel.position.z += (-halfDepth - (center.z - size.z/2));
+                loadedModel.userData.velocity.z *= -0.7;
+                // Add spin effect
+                loadedModel.userData.angularVelocity.x -= loadedModel.userData.velocity.y * 0.1;
+            }
+            else if (center.z + size.z/2 > halfDepth) {
+                loadedModel.position.z -= ((center.z + size.z/2) - halfDepth);
+                loadedModel.userData.velocity.z *= -0.7;
+                // Add spin effect
+                loadedModel.userData.angularVelocity.x += loadedModel.userData.velocity.y * 0.1;
+            }
+        }
+        
+        // Main simulation step - PIC/FLIP fluid solver
+        function updateSimulation(deltaTime) {
+            // Get grid dimensions for convenience
+            const gridWidth = params.gridWidth;
+            const gridHeight = params.gridHeight;
+            const gridDepth = params.gridDepth;
+            const gridResX = params.gridResolutionX;
+            const gridResY = params.gridResolutionY;
+            const gridResZ = params.gridResolutionZ;
+            
+            // Grid cell sizes
+            const cellSizeX = gridWidth / gridResX;
+            const cellSizeY = gridHeight / gridResY;
+            const cellSizeZ = gridDepth / gridResZ;
+            
+            // Grid origin (center of the simulation domain)
+            const originX = -gridWidth / 2;
+            const originY = -gridHeight / 2;
+            const originZ = -gridDepth / 2;
+            
+            // Temporary arrays for simulation
+            let velocityGrid = new Float32Array(gridResX * gridResY * gridResZ * 3);
+            let weightGrid = new Float32Array(gridResX * gridResY * gridResZ);
+            
+            // Step 1: Transfer particle velocities to grid
+            // Reset grid values
+            for (let i = 0; i < velocityGrid.length; i++) {
+                velocityGrid[i] = 0;
+            }
+            for (let i = 0; i < weightGrid.length; i++) {
+                weightGrid[i] = 0;
+            }
+            
+            // Function to get grid cell index
+            function getGridIndex(x, y, z) {
+                return (z * gridResY * gridResX) + (y * gridResX) + x;
+            }
+            
+            // Transfer particles to grid with linear interpolation
+            for (let i = 0; i < params.particleCount; i++) {
+                const px = particlePositions[i * 4];
+                const py = particlePositions[i * 4 + 1];
+                const pz = particlePositions[i * 4 + 2];
+                
+                // Convert world position to grid position
+                const gridX = (px - originX) / cellSizeX;
+                const gridY = (py - originY) / cellSizeY;
+                const gridZ = (pz - originZ) / cellSizeZ;
+                
+                // Grid cell indices (floor to get cell containing the particle)
+                const ix = Math.floor(gridX);
+                const iy = Math.floor(gridY);
+                const iz = Math.floor(gridZ);
+                
+                // Ensure we're within bounds
+                if (ix < 0 || ix >= gridResX - 1 || iy < 0 || iy >= gridResY - 1 || iz < 0 || iz >= gridResZ - 1) {
+                    continue;
+                }
+                
+                // Interpolation factors
+                const fx = gridX - ix;
+                const fy = gridY - iy;
+                const fz = gridZ - iz;
+                
+                // Particle velocity
+                const vx = particleVelocities[i * 4];
+                const vy = particleVelocities[i * 4 + 1];
+                const vz = particleVelocities[i * 4 + 2];
+                
+                // Trilinear interpolation weights
+                const w000 = (1 - fx) * (1 - fy) * (1 - fz);
+                const w001 = (1 - fx) * (1 - fy) * fz;
+                const w010 = (1 - fx) * fy * (1 - fz);
+                const w011 = (1 - fx) * fy * fz;
+                const w100 = fx * (1 - fy) * (1 - fz);
+                const w101 = fx * (1 - fy) * fz;
+                const w110 = fx * fy * (1 - fz);
+                const w111 = fx * fy * fz;
+                
+                // Transfer to grid cells
+                const idx000 = getGridIndex(ix, iy, iz);
+                const idx001 = getGridIndex(ix, iy, iz + 1);
+                const idx010 = getGridIndex(ix, iy + 1, iz);
+                const idx011 = getGridIndex(ix, iy + 1, iz + 1);
+                const idx100 = getGridIndex(ix + 1, iy, iz);
+                const idx101 = getGridIndex(ix + 1, iy, iz + 1);
+                const idx110 = getGridIndex(ix + 1, iy + 1, iz);
+                const idx111 = getGridIndex(ix + 1, iy + 1, iz + 1);
+                
+                // Update grid velocity (weighted sum)
+                velocityGrid[idx000 * 3] += vx * w000;
+                velocityGrid[idx000 * 3 + 1] += vy * w000;
+                velocityGrid[idx000 * 3 + 2] += vz * w000;
+                weightGrid[idx000] += w000;
+                
+                velocityGrid[idx001 * 3] += vx * w001;
+                velocityGrid[idx001 * 3 + 1] += vy * w001;
+                velocityGrid[idx001 * 3 + 2] += vz * w001;
+                weightGrid[idx001] += w001;
+                
+                velocityGrid[idx010 * 3] += vx * w010;
+                velocityGrid[idx010 * 3 + 1] += vy * w010;
+                velocityGrid[idx010 * 3 + 2] += vz * w010;
+                weightGrid[idx010] += w010;
+                
+                velocityGrid[idx011 * 3] += vx * w011;
+                velocityGrid[idx011 * 3 + 1] += vy * w011;
+                velocityGrid[idx011 * 3 + 2] += vz * w011;
+                weightGrid[idx011] += w011;
+                
+                velocityGrid[idx100 * 3] += vx * w100;
+                velocityGrid[idx100 * 3 + 1] += vy * w100;
+                velocityGrid[idx100 * 3 + 2] += vz * w100;
+                weightGrid[idx100] += w100;
+                
+                velocityGrid[idx101 * 3] += vx * w101;
+                velocityGrid[idx101 * 3 + 1] += vy * w101;
+                velocityGrid[idx101 * 3 + 2] += vz * w101;
+                weightGrid[idx101] += w101;
+                
+                velocityGrid[idx110 * 3] += vx * w110;
+                velocityGrid[idx110 * 3 + 1] += vy * w110;
+                velocityGrid[idx110 * 3 + 2] += vz * w110;
+                weightGrid[idx110] += w110;
+                
+                velocityGrid[idx111 * 3] += vx * w111;
+                velocityGrid[idx111 * 3 + 1] += vy * w111;
+                velocityGrid[idx111 * 3 + 2] += vz * w111;
+                weightGrid[idx111] += w111;
+            }
+            
+            // Normalize grid velocities
+            for (let i = 0; i < gridResX * gridResY * gridResZ; i++) {
+                if (weightGrid[i] > 0.0001) {
+                    velocityGrid[i * 3] /= weightGrid[i];
+                    velocityGrid[i * 3 + 1] /= weightGrid[i];
+                    velocityGrid[i * 3 + 2] /= weightGrid[i];
+                }
+            }
+            
+            // Save original velocity field for FLIP
+            const originalVelocityGrid = velocityGrid.slice();
+            
+            // Step 2: Apply external forces (gravity)
+            for (let i = 0; i < gridResX * gridResY * gridResZ; i++) {
+                if (weightGrid[i] > 0.0001) {
+                    // Apply gravity
+                    velocityGrid[i * 3 + 1] += -9.8 * deltaTime;
+                }
+            }
+            
+            // Step 3: Apply boundary conditions
+            enforceBoundaries(velocityGrid, weightGrid);
+            
+            // Step 4: Update particle velocities (PIC/FLIP)
+            for (let i = 0; i < params.particleCount; i++) {
+                const px = particlePositions[i * 4];
+                const py = particlePositions[i * 4 + 1];
+                const pz = particlePositions[i * 4 + 2];
+                
+                // Convert world position to grid coordinates
+                const gridX = (px - originX) / cellSizeX;
+                const gridY = (py - originY) / cellSizeY;
+                const gridZ = (pz - originZ) / cellSizeZ;
+                
+                // Grid cell indices (floor to get cell containing the particle)
+                const ix = Math.floor(gridX);
+                const iy = Math.floor(gridY);
+                const iz = Math.floor(gridZ);
+                
+                // Check if we're within bounds
+                if (ix < 0 || ix >= gridResX - 1 || iy < 0 || iy >= gridResY - 1 || iz < 0 || iz >= gridResZ - 1) {
+                    continue;
+                }
+                
+                // Interpolation factors
+                const fx = gridX - ix;
+                const fy = gridY - iy;
+                const fz = gridZ - iz;
+                
+                // Trilinear interpolation weights
+                const w000 = (1 - fx) * (1 - fy) * (1 - fz);
+                const w001 = (1 - fx) * (1 - fy) * fz;
+                const w010 = (1 - fx) * fy * (1 - fz);
+                const w011 = (1 - fx) * fy * fz;
+                const w100 = fx * (1 - fy) * (1 - fz);
+                const w101 = fx * (1 - fy) * fz;
+                const w110 = fx * fy * (1 - fz);
+                const w111 = fx * fy * fz;
+                
+                // Grid indices
+                const idx000 = getGridIndex(ix, iy, iz);
+                const idx001 = getGridIndex(ix, iy, iz + 1);
+                const idx010 = getGridIndex(ix, iy + 1, iz);
+                const idx011 = getGridIndex(ix, iy + 1, iz + 1);
+                const idx100 = getGridIndex(ix + 1, iy, iz);
+                const idx101 = getGridIndex(ix + 1, iy, iz + 1);
+                const idx110 = getGridIndex(ix + 1, iy + 1, iz);
+                const idx111 = getGridIndex(ix + 1, iy + 1, iz + 1);
+                
+                // Interpolate grid velocity (PIC)
+                const gridVelX = 
+                    velocityGrid[idx000 * 3] * w000 +
+                    velocityGrid[idx001 * 3] * w001 +
+                    velocityGrid[idx010 * 3] * w010 +
+                    velocityGrid[idx011 * 3] * w011 +
+                    velocityGrid[idx100 * 3] * w100 +
+                    velocityGrid[idx101 * 3] * w101 +
+                    velocityGrid[idx110 * 3] * w110 +
+                    velocityGrid[idx111 * 3] * w111;
+                
+                const gridVelY = 
+                    velocityGrid[idx000 * 3 + 1] * w000 +
+                    velocityGrid[idx001 * 3 + 1] * w001 +
+                    velocityGrid[idx010 * 3 + 1] * w010 +
+                    velocityGrid[idx011 * 3 + 1] * w011 +
+                    velocityGrid[idx100 * 3 + 1] * w100 +
+                    velocityGrid[idx101 * 3 + 1] * w101 +
+                    velocityGrid[idx110 * 3 + 1] * w110 +
+                    velocityGrid[idx111 * 3 + 1] * w111;
+                
+                const gridVelZ = 
+                    velocityGrid[idx000 * 3 + 2] * w000 +
+                    velocityGrid[idx001 * 3 + 2] * w001 +
+                    velocityGrid[idx010 * 3 + 2] * w010 +
+                    velocityGrid[idx011 * 3 + 2] * w011 +
+                    velocityGrid[idx100 * 3 + 2] * w100 +
+                    velocityGrid[idx101 * 3 + 2] * w101 +
+                    velocityGrid[idx110 * 3 + 2] * w110 +
+                    velocityGrid[idx111 * 3 + 2] * w111;
+                
+                // Interpolate original grid velocity for FLIP component
+                const origGridVelX = 
+                    originalVelocityGrid[idx000 * 3] * w000 +
+                    originalVelocityGrid[idx001 * 3] * w001 +
+                    originalVelocityGrid[idx010 * 3] * w010 +
+                    originalVelocityGrid[idx011 * 3] * w011 +
+                    originalVelocityGrid[idx100 * 3] * w100 +
+                    originalVelocityGrid[idx101 * 3] * w101 +
+                    originalVelocityGrid[idx110 * 3] * w110 +
+                    originalVelocityGrid[idx111 * 3] * w111;
+                
+                const origGridVelY = 
+                    originalVelocityGrid[idx000 * 3 + 1] * w000 +
+                    originalVelocityGrid[idx001 * 3 + 1] * w001 +
+                    originalVelocityGrid[idx010 * 3 + 1] * w010 +
+                    originalVelocityGrid[idx011 * 3 + 1] * w011 +
+                    originalVelocityGrid[idx100 * 3 + 1] * w100 +
+                    originalVelocityGrid[idx101 * 3 + 1] * w101 +
+                    originalVelocityGrid[idx110 * 3 + 1] * w110 +
+                    originalVelocityGrid[idx111 * 3 + 1] * w111;
+                
+                const origGridVelZ = 
+                    originalVelocityGrid[idx000 * 3 + 2] * w000 +
+                    originalVelocityGrid[idx001 * 3 + 2] * w001 +
+                    originalVelocityGrid[idx010 * 3 + 2] * w010 +
+                    originalVelocityGrid[idx011 * 3 + 2] * w011 +
+                    originalVelocityGrid[idx100 * 3 + 2] * w100 +
+                    originalVelocityGrid[idx101 * 3 + 2] * w101 +
+                    originalVelocityGrid[idx110 * 3 + 2] * w110 +
+                    originalVelocityGrid[idx111 * 3 + 2] * w111;
+                
+                // FLIP: velocity = oldParticleVelocity + (newGridVelocity - oldGridVelocity)
+                // PIC: velocity = newGridVelocity
+                // Mix PIC and FLIP based on flipness parameter
+                const oldVelX = particleVelocities[i * 4];
+                const oldVelY = particleVelocities[i * 4 + 1];
+                const oldVelZ = particleVelocities[i * 4 + 2];
+                
+                const flipVelX = oldVelX + (gridVelX - origGridVelX);
+                const flipVelY = oldVelY + (gridVelY - origGridVelY);
+                const flipVelZ = oldVelZ + (gridVelZ - origGridVelZ);
+                
+                // Mix PIC and FLIP
+                particleVelocities[i * 4] = gridVelX * (1.0 - params.flipness) + flipVelX * params.flipness;
+                particleVelocities[i * 4 + 1] = gridVelY * (1.0 - params.flipness) + flipVelY * params.flipness;
+                particleVelocities[i * 4 + 2] = gridVelZ * (1.0 - params.flipness) + flipVelZ * params.flipness;
+            }
+            
+            // Step 5: Advect particles
+            for (let i = 0; i < params.particleCount; i++) {
+                // Semi-implicit Euler integration
+                particlePositions[i * 4] += particleVelocities[i * 4] * deltaTime;
+                particlePositions[i * 4 + 1] += particleVelocities[i * 4 + 1] * deltaTime;
+                particlePositions[i * 4 + 2] += particleVelocities[i * 4 + 2] * deltaTime;
+                
+                // Check and handle collisions with model
+                checkParticleModelCollision(i);
+                
+                // Enforce boundary conditions
+                enforceParticleBoundaries(i);
+                
+                // Update the visualization
+                particleSystem.geometry.attributes.position.array[i * 3] = particlePositions[i * 4];
+                particleSystem.geometry.attributes.position.array[i * 3 + 1] = particlePositions[i * 4 + 1];
+                particleSystem.geometry.attributes.position.array[i * 3 + 2] = particlePositions[i * 4 + 2];
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // Helper function to enforce grid boundary conditions
+        function enforceBoundaries(velocityGrid, weightGrid) {
+            const gridResX = params.gridResolutionX;
+            const gridResY = params.gridResolutionY;
+            const gridResZ = params.gridResolutionZ;
+            
+            // Function to get grid cell index
+            function getGridIndex(x, y, z) {
+                return (z * gridResY * gridResX) + (y * gridResX) + x;
+            }
+            
+            // Enforce boundaries for each cell
+            for (let x = 0; x < gridResX; x++) {
+                for (let y = 0; y < gridResY; y++) {
+                    for (let z = 0; z < gridResZ; z++) {
+                        const idx = getGridIndex(x, y, z);
+                        
+                        // Skip empty cells
+                        if (weightGrid[idx] < 0.0001) continue;
+                        
+                        // Left/right boundaries
+                        if (x === 0) {
+                            velocityGrid[idx * 3] = Math.max(0, velocityGrid[idx * 3]); // No flow through left boundary
+                        } else if (x === gridResX - 1) {
+                            velocityGrid[idx * 3] = Math.min(0, velocityGrid[idx * 3]); // No flow through right boundary
+                        }
+                        
+                        // Bottom/top boundaries
+                        if (y === 0) {
+                            velocityGrid[idx * 3 + 1] = Math.max(0, velocityGrid[idx * 3 + 1]); // No flow through bottom
+                        } else if (y === gridResY - 1) {
+                            velocityGrid[idx * 3 + 1] = Math.min(0, velocityGrid[idx * 3 + 1]); // No flow through top
+                        }
+                        
+                        // Front/back boundaries
+                        if (z === 0) {
+                            velocityGrid[idx * 3 + 2] = Math.max(0, velocityGrid[idx * 3 + 2]); // No flow through front
+                        } else if (z === gridResZ - 1) {
+                            velocityGrid[idx * 3 + 2] = Math.min(0, velocityGrid[idx * 3 + 2]); // No flow through back
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Helper function to enforce particle boundary conditions
+        function enforceParticleBoundaries(particleIndex) {
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            const px = particlePositions[particleIndex * 4];
+            const py = particlePositions[particleIndex * 4 + 1];
+            const pz = particlePositions[particleIndex * 4 + 2];
+            
+            const vx = particleVelocities[particleIndex * 4];
+            const vy = particleVelocities[particleIndex * 4 + 1];
+            const vz = particleVelocities[particleIndex * 4 + 2];
+            
+            const damping = 0.3; // Collision damping factor
+            
+            // Check X boundaries
+            if (px < -halfWidth) {
+                particlePositions[particleIndex * 4] = -halfWidth;
+                particleVelocities[particleIndex * 4] = -vx * damping;
+            } else if (px > halfWidth) {
+                particlePositions[particleIndex * 4] = halfWidth;
+                particleVelocities[particleIndex * 4] = -vx * damping;
+            }
+            
+            // Check Y boundaries
+            if (py < -halfHeight) {
+                particlePositions[particleIndex * 4 + 1] = -halfHeight;
+                particleVelocities[particleIndex * 4 + 1] = -vy * damping;
+            } else if (py > halfHeight) {
+                particlePositions[particleIndex * 4 + 1] = halfHeight;
+                particleVelocities[particleIndex * 4 + 1] = -vy * damping;
+            }
+            
+            // Check Z boundaries
+            if (pz < -halfDepth) {
+                particlePositions[particleIndex * 4 + 2] = -halfDepth;
+                particleVelocities[particleIndex * 4 + 2] = -vz * damping;
+            } else if (pz > halfDepth) {
+                particlePositions[particleIndex * 4 + 2] = halfDepth;
+                particleVelocities[particleIndex * 4 + 2] = -vz * damping;
+            }
+        }
+        
+        // Check for collision between particle and loaded model
+        function checkParticleModelCollision(particleIndex) {
+            if (!loadedModel || modelMeshes.length === 0) return;
+            
+            const px = particlePositions[particleIndex * 4];
+            const py = particlePositions[particleIndex * 4 + 1];
+            const pz = particlePositions[particleIndex * 4 + 2];
+            
+            // Quick check against model bounding box
+            const modelPosition = loadedModel.position;
+            const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            
+            // Add padding for particle radius
+            const particleRadius = params.sphereRadius * 0.5;
+            boundingBox.expandByScalar(particleRadius);
+            
+            const particlePoint = new THREE.Vector3(px, py, pz);
+            
+            // If particle is within expanded bounding box
+            if (boundingBox.containsPoint(particlePoint)) {
+                // Check against model
+                for (let i = 0; i < modelMeshes.length; i++) {
+                    const meshBox = modelMeshes[i].boundingBox.clone();
+                    meshBox.expandByScalar(particleRadius);
+                    
+                    if (meshBox.containsPoint(particlePoint)) {
+                        // Calculate approximate normal (from particle to mesh center)
+                        const meshCenter = new THREE.Vector3();
+                        meshBox.getCenter(meshCenter);
+                        
+                        const normal = new THREE.Vector3(
+                            particlePoint.x - meshCenter.x,
+                            particlePoint.y - meshCenter.y,
+                            particlePoint.z - meshCenter.z
+                        ).normalize();
+                        
+                        // Apply impulse to model
+                        const velocityMagnitude = Math.sqrt(
+                            particleVelocities[particleIndex * 4] * particleVelocities[particleIndex * 4] +
+                            particleVelocities[particleIndex * 4 + 1] * particleVelocities[particleIndex * 4 + 1] +
+                            particleVelocities[particleIndex * 4 + 2] * particleVelocities[particleIndex * 4 + 2]
+                        );
+                        
+                        // Apply impulse to model (scaled by particle velocity)
+                        if (velocityMagnitude > 0.1) {
+                            const impulseFactor = 0.001;
+                            loadedModel.userData.velocity.x += normal.x * velocityMagnitude * impulseFactor;
+                            loadedModel.userData.velocity.y += normal.y * velocityMagnitude * impulseFactor;
+                            loadedModel.userData.velocity.z += normal.z * velocityMagnitude * impulseFactor;
+                            
+                            // Add some angular velocity
+                            const torqueDir = new THREE.Vector3().crossVectors(
+                                particlePoint.clone().sub(modelPosition),
+                                normal
+                            ).normalize().multiplyScalar(0.0002 * velocityMagnitude);
+                            
+                            loadedModel.userData.angularVelocity.add(torqueDir);
+                        }
+                        
+                        // Reflect particle velocity
+                        const vx = particleVelocities[particleIndex * 4];
+                        const vy = particleVelocities[particleIndex * 4 + 1];
+                        const vz = particleVelocities[particleIndex * 4 + 2];
+                        
+                        const dot = vx * normal.x + vy * normal.y + vz * normal.z;
+                        
+                        // Only reflect if moving toward surface
+                        if (dot < 0) {
+                            const damping = 0.5;
+                            
+                            // Reflect velocity
+                            particleVelocities[particleIndex * 4] = (vx - 2 * dot * normal.x) * damping;
+                            particleVelocities[particleIndex * 4 + 1] = (vy - 2 * dot * normal.y) * damping;
+                            particleVelocities[particleIndex * 4 + 2] = (vz - 2 * dot * normal.z) * damping;
+                            
+                            // Move particle outside the collision
+                            particlePositions[particleIndex * 4] = px + normal.x * particleRadius * 1.01;
+                            particlePositions[particleIndex * 4 + 1] = py + normal.y * particleRadius * 1.01;
+                            particlePositions[particleIndex * 4 + 2] = pz + normal.z * particleRadius * 1.01;
+                        }
+                        
+                        return; // Only handle one collision per particle per frame
+                    }
+                }
+            }
+        }
+        
+        // Main animation loop
+        function animate(now) {
+            requestAnimationFrame(animate);
+            
+            // Update FPS counter
+            updateFPSCounter(now);
+            
+            // Update controls
+            if (controls) {
+                controls.update();
+            }
+            
+            // Get the time elapsed since the last frame
+            const deltaTime = Math.min(clock.getDelta(), 0.05) * params.timeScale;
+            
+            // Update object physics
+            updateObjectPhysics(deltaTime);
+            
+            if (!isSimulationPaused) {
+                // Update fluid simulation
+                updateSimulation(deltaTime);
+            }
+            
+            // Render
+            renderer.render(scene, camera);
+        }
+        
+        // Start the simulation when the page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
