@@ -512,7 +512,7 @@
             <div class="preset-buttons">
                 <button class="preset-btn active" id="preset-water">Water</button>
                 <button class="preset-btn" id="preset-blocks">Block Test</button>
-                <button class="preset-btn" id="preset-spheres">Spheres</button>
+                <button class="preset-btn" id="preset-spheres" onclick="applyPreset('spheres')">Spheres</button>
 
             </div>
         </div>
@@ -1181,7 +1181,7 @@
             // and implement the core simulation steps
         }
         
-
+        // presets buttons
         function applyPreset(presetName) {
             // Update active button styling
             document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -1206,15 +1206,15 @@
                 document.getElementById('fluidity-value').textContent = "0.95";
                 params.flipness = 0.95;
                 
-                document.getElementById('speed').value = 1.0;
-                document.getElementById('speed-value').textContent = "1.0";
-                params.timeScale = 1.0;
+                document.getElementById('speed').value = 0.4; // Lower speed
+                document.getElementById('speed-value').textContent = "0.4";
+                params.timeScale = 0.4;
                 
-                // Fluid-specific parameters
-                params.viscosity = 1.5;        // Higher viscosity for better settling
-                params.pressureStiffness = 15.0; // Moderate pressure
-                params.surfaceTension = 0.8;   // Moderate surface tension
-                params.restitution = 0.2;      // Low bounce
+                // Calm fluid-specific parameters
+                params.viscosity = 2.5;        // Very high viscosity for better settling
+                params.pressureStiffness = 20.0; // Higher pressure to maintain spacing
+                params.surfaceTension = 1.0;   // Moderate surface tension
+                params.restitution = 0.05;     // Almost no bounce
             } else if (presetName === 'blocks') {
                 // More viscous, blocky fluid
                 particleMaterial.color.set(0xdddddd);
@@ -1227,15 +1227,15 @@
                 document.getElementById('fluidity-value').textContent = "0.70";
                 params.flipness = 0.7;
                 
-                document.getElementById('speed').value = 0.8;
-                document.getElementById('speed-value').textContent = "0.8";
-                params.timeScale = 0.8;
+                document.getElementById('speed').value = 0.4; // Lower speed
+                document.getElementById('speed-value').textContent = "0.4";
+                params.timeScale = 0.4;
                 
                 // Block-specific parameters
-                params.viscosity = 2.0;        // More viscous
-                params.pressureStiffness = 25.0; // Stronger pressure
-                params.surfaceTension = 1.2;   // Stronger surface tension
-                params.restitution = 0.15;     // Very little bounce
+                params.viscosity = 3.0;        // Even more viscous
+                params.pressureStiffness = 30.0; // Stronger pressure
+                params.surfaceTension = 1.5;   // Stronger surface tension
+                params.restitution = 0.05;     // Almost no bounce
             } else if (presetName === 'spheres') {
                 // Perfect spherical appearance
                 particleMaterial.color.set(0x4fadff);
@@ -1251,19 +1251,122 @@
                 document.getElementById('fluidity-value').textContent = "0.85";
                 params.flipness = 0.85;
                 
-                document.getElementById('speed').value = 0.9;
-                document.getElementById('speed-value').textContent = "0.9";
-                params.timeScale = 0.9;
+                document.getElementById('speed').value = 0.4; // Lower speed
+                document.getElementById('speed-value').textContent = "0.4";
+                params.timeScale = 0.4;
                 
                 // Sphere-specific parameters
-                params.viscosity = 0.8;        // Lower viscosity
-                params.pressureStiffness = 20.0; // Medium pressure
-                params.surfaceTension = 1.5;   // High surface tension for spherical shape
-                params.restitution = 0.3;      // Medium bounce
+                params.viscosity = 2.0;        // Higher viscosity
+                params.pressureStiffness = 25.0; // Higher pressure
+                params.surfaceTension = 2.0;   // High surface tension for spherical shape
+                params.restitution = 0.05;     // Almost no bounce
+            } else if (presetName === 'static') {
+                // Static water that barely moves
+                particleMaterial.color.set(0x00aaff);
+                particleMaterial.size = params.sphereRadius * 2;
+                particleMaterial.opacity = 0.7;
+                particleMaterial.blending = THREE.AdditiveBlending;
+                
+                // Update sliders
+                document.getElementById('fluidity').value = 0.6; // Lower FLIP value for more stability
+                document.getElementById('fluidity-value').textContent = "0.60";
+                params.flipness = 0.6;
+                
+                document.getElementById('speed').value = 0.2; // Very low speed
+                document.getElementById('speed-value').textContent = "0.2";
+                params.timeScale = 0.2;
+                
+                // Static fluid parameters - extreme values for minimal movement
+                params.viscosity = 5.0;        // Extremely high viscosity
+                params.pressureStiffness = 40.0; // Very high pressure for rigid structure
+                params.surfaceTension = 3.0;   // Very high surface tension
+                params.restitution = 0.01;     // Practically no bounce
             }
             
             updateDerivedParameters();
             resetSimulation();
+        }
+        
+        //TEMPORARY FIX!!!!!!! extra damping should not be needed later on if properly initiated obj bounds
+        function applyExtraDamping() {
+            // Apply stronger velocity cap
+            for (let i = 0; i < params.particleCount; i++) {
+                // Detect if particle is near bottom of container
+                const py = particlePositions[i * 4 + 1];
+                const bottomDistance = py - (-params.gridHeight/2 + params.particleRadius);
+                
+                // Particles near bottom get extra damping
+                if (bottomDistance < params.particleRadius * 3) {
+                    // Apply stronger damping to particles near the bottom
+                    const bottomDamping = 0.9; // 10% velocity reduction
+                    particleVelocities[i * 4] *= bottomDamping;
+                    particleVelocities[i * 4 + 1] *= bottomDamping;
+                    particleVelocities[i * 4 + 2] *= bottomDamping;
+                    
+                    // Also apply a small downward force to keep particles on the bottom
+                    particleVelocities[i * 4 + 1] -= 0.05;
+                }
+            }
+        }
+
+        // TEMPORARY FIX!!!!! for even more extreme calming, run a separate pass to stabilize particles
+        function stabilizeFluid() {
+            // Detect when particles are in a stable configuration and almost stop them
+            // This is a heuristic that looks for particles that have settled into a layer
+            
+            // First identify which particles are in stable layers
+            const layerHeight = params.particleRadius * 2.5;
+            const layerCounts = new Array(20).fill(0); // Count particles in each layer
+            
+            // Count particles per horizontal layer
+            for (let i = 0; i < params.particleCount; i++) {
+                const py = particlePositions[i * 4 + 1];
+                const layerIndex = Math.floor((py + params.gridHeight/2) / layerHeight);
+                
+                if (layerIndex >= 0 && layerIndex < layerCounts.length) {
+                    layerCounts[layerIndex]++;
+                }
+            }
+            
+            // Identify dense layers (many particles in same horizontal slice)
+            const denseThreshold = params.particleCount / layerCounts.length * 1.5;
+            const denseLayerIndices = [];
+            
+            for (let i = 0; i < layerCounts.length; i++) {
+                if (layerCounts[i] > denseThreshold) {
+                    denseLayerIndices.push(i);
+                }
+            }
+            
+            // If we have dense layers, stabilize particles in them
+            if (denseLayerIndices.length > 0) {
+                for (let i = 0; i < params.particleCount; i++) {
+                    const py = particlePositions[i * 4 + 1];
+                    const layerIndex = Math.floor((py + params.gridHeight/2) / layerHeight);
+                    
+                    // Check if this particle is in a dense layer
+                    if (denseLayerIndices.includes(layerIndex)) {
+                        // If particle is in a dense layer, heavily damp its velocity
+                        const stabilizationFactor = 0.8; // 20% velocity reduction
+                        particleVelocities[i * 4] *= stabilizationFactor;
+                        particleVelocities[i * 4 + 1] *= stabilizationFactor;
+                        particleVelocities[i * 4 + 2] *= stabilizationFactor;
+                        
+                        // If particle is moving very slowly, stop it completely
+                        const vx = particleVelocities[i * 4];
+                        const vy = particleVelocities[i * 4 + 1];
+                        const vz = particleVelocities[i * 4 + 2];
+                        
+                        const velMagSquared = vx*vx + vy*vy + vz*vz;
+                        
+                        if (velMagSquared < 0.01) {
+                            particleVelocities[i * 4] = 0;
+                            particleVelocities[i * 4 + 1] = 0;
+                            particleVelocities[i * 4 + 2] = 0;
+                        }
+                    }
+                }
+            }
         }
 
         // Initialize event listeners
@@ -1274,9 +1377,18 @@
             });
             
             document.getElementById('particle-count').addEventListener('input', (e) => {
-                const value = parseInt(e.target.value);
-                document.getElementById('particle-count-value').textContent = value;
-                params.particleCount = value;
+                const newParticleCount = parseInt(e.target.value);
+                document.getElementById('particle-count-value').textContent = newParticleCount;
+                
+                // Store previous count for proper transition
+                const oldParticleCount = params.particleCount;
+                params.particleCount = newParticleCount;
+                
+                // Update derived parameters
+                updateDerivedParameters();
+                
+                // Handle the change in particle count
+                updateParticleCount(oldParticleCount, newParticleCount);
             });
             
             document.getElementById('fluidity').addEventListener('input', (e) => {
@@ -1303,6 +1415,19 @@
 
                 updateDerivedParameters();
             });
+
+
+            //TEMPORARY FIX!!!!!!
+            // document.addEventListener('DOMContentLoaded', function() {
+            //     // Find the spheres button and attach event listener directly
+            //     const spheresButton = document.getElementById('preset-spheres');
+            //     if (spheresButton) {
+            //         spheresButton.addEventListener('click', function() {
+            //             applyPreset('spheres');
+            //         });
+            //     }
+            // });
+
             
             document.getElementById('render-style').addEventListener('change', (e) => {
                 params.renderStyle = e.target.value;
@@ -2012,6 +2137,35 @@
             }
         }
         
+        // TEMPORARY FIX!!!!!! to completely reset particle velocities when they're moving very slowly
+        function updateVelocityDampingForCalm() {
+            for (let i = 0; i < params.particleCount; i++) {
+                // Get current velocity magnitude
+                const vx = particleVelocities[i * 4];
+                const vy = particleVelocities[i * 4 + 1];
+                const vz = particleVelocities[i * 4 + 2];
+                
+                const velMagSquared = vx*vx + vy*vy + vz*vz;
+                
+                // Much more aggressive velocity damping for stability
+                const stoppingThreshold = 0.05; // Higher threshold to stop particles
+                if (velMagSquared < stoppingThreshold * stoppingThreshold) {
+                    // Almost completely stop very slow particles
+                    particleVelocities[i * 4] *= 0.7;
+                    particleVelocities[i * 4 + 1] *= 0.7;
+                    particleVelocities[i * 4 + 2] *= 0.7;
+                    
+                    // If extremely slow, stop completely
+                    const nearZeroThreshold = 0.01;
+                    if (velMagSquared < nearZeroThreshold * nearZeroThreshold) {
+                        particleVelocities[i * 4] = 0;
+                        particleVelocities[i * 4 + 1] = 0;
+                        particleVelocities[i * 4 + 2] = 0;
+                    }
+                }
+            }
+        }
+
         // Update object physics
         function updateObjectPhysics(deltaTime) {
             if (!loadedModel) return;
@@ -2443,6 +2597,11 @@
             
             // Update the visualization
             updateParticleVisualization();
+
+            // TEMPORARY FIX!!!!!! Update to slow particles to a halt when moving very slowly
+            updateVelocityDampingForCalm();
+            applyExtraDamping();
+            stabilizeFluid();
             
             // Helper function to compute divergence
             function computeDivergence(velocityGrid, divergenceGrid, markerGrid) {
@@ -2761,15 +2920,15 @@
                     const velMagSquared = vx*vx + vy*vy + vz*vz;
                     
                     // Apply global damping (higher than before)
-                    const globalDamping = 0.98; // 2% velocity reduction per step
+                    const globalDamping = 0.95; // 2% velocity reduction per step
                     
                     // Apply additional damping when velocity is low to help settling
-                    const settlingThreshold = 0.1;
+                    const settlingThreshold = 0.5;
                     let totalDamping = globalDamping;
                     
                     if (velMagSquared < settlingThreshold * settlingThreshold) {
                         // Stronger damping for low velocities
-                        const settlingDamping = 0.9; // 10% additional reduction for slow particles
+                        const settlingDamping = 0.8; // 10% additional reduction for slow particles
                         totalDamping *= settlingDamping;
                     }
                     
@@ -3032,6 +3191,75 @@
                         }
                     }
                 }
+            }
+        }
+
+        //  Helper function to properly change particle count with deletion.
+        function updateParticleCount(oldCount, newCount) {
+            // Calculate particles dimensions based on count
+            const aspectRatio = 1;
+            params.particlesWidth = Math.ceil(Math.sqrt(newCount * aspectRatio));
+            params.particlesHeight = Math.ceil(newCount / params.particlesWidth);
+            
+            if (newCount < oldCount) {
+                // If reducing particles, hide excess particles by moving them far away
+                for (let i = newCount; i < oldCount; i++) {
+                    // Move particles far outside the visible area
+                    particlePositions[i * 4] = 9999;
+                    particlePositions[i * 4 + 1] = 9999;
+                    particlePositions[i * 4 + 2] = 9999;
+                    
+                    // Zero out their velocities
+                    particleVelocities[i * 4] = 0;
+                    particleVelocities[i * 4 + 1] = 0;
+                    particleVelocities[i * 4 + 2] = 0;
+                    
+                    // Update the visualization
+                    particleSystem.geometry.attributes.position.array[i * 3] = 9999;
+                    particleSystem.geometry.attributes.position.array[i * 3 + 1] = 9999;
+                    particleSystem.geometry.attributes.position.array[i * 3 + 2] = 9999;
+                }
+            } else if (newCount > oldCount) {
+                // If increasing particles, initialize new particles in a sensible way
+                initializeNewParticles(oldCount, newCount);
+            }
+            
+            // Update the THREE.js buffer
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Helper to initialize new particles when increasing count
+        function initializeNewParticles(startIndex, endIndex) {
+            // Place new particles in a grid at the top of the container
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            const particleSpacing = params.particleRadius * 2.2;
+            const particlesPerRow = Math.ceil(Math.sqrt(endIndex - startIndex));
+            
+            let idx = 0;
+            for (let i = startIndex; i < endIndex; i++) {
+                // Calculate grid position for new particles at the top of the container
+                const row = Math.floor(idx / particlesPerRow);
+                const col = idx % particlesPerRow;
+                
+                // Place particles in a flat layer at the top
+                particlePositions[i * 4] = -halfWidth + 2 + (col * particleSpacing);
+                particlePositions[i * 4 + 1] = halfHeight - 2; // Near the top
+                particlePositions[i * 4 + 2] = -halfDepth + 2 + (row * particleSpacing);
+                
+                // Small initial velocity downward
+                particleVelocities[i * 4] = (Math.random() - 0.5) * 0.1;
+                particleVelocities[i * 4 + 1] = -0.5 - Math.random() * 0.5;
+                particleVelocities[i * 4 + 2] = (Math.random() - 0.5) * 0.1;
+                
+                // Update the visualization
+                particleSystem.geometry.attributes.position.array[i * 3] = particlePositions[i * 4];
+                particleSystem.geometry.attributes.position.array[i * 3 + 1] = particlePositions[i * 4 + 1];
+                particleSystem.geometry.attributes.position.array[i * 3 + 2] = particlePositions[i * 4 + 2];
+                
+                idx++;
             }
         }
 
