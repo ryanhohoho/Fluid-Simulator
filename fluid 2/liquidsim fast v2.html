@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Fluid Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 12px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+            max-width: 280px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        #status {
+            color: #3498db;
+            font-weight: bold;
+        }
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        .loading-text {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Controls Panel Styles */
+        .controls-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            z-index: 100;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+        
+        .controls-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 8px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #3498db;
+            font-size: 14px;
+        }
+        
+        .slider-container {
+            margin-bottom: 10px;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        
+        .slider-name {
+            font-size: 13px;
+        }
+        
+        .slider-value {
+            font-size: 13px;
+            font-family: monospace;
+            color: #666;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 8px;
+        }
+        
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        
+        .reset-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .reset-button:hover {
+            background-color: #2980b9;
+        }
+        
+        .collapse-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading-screen">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading Simulation...</div>
+    </div>
+    
+    <div class="info">
+        <div class="title">3D Water Simulation</div>
+        <div>• Drag with mouse to rotate view</div>
+        <div>• Scroll to zoom in/out</div>
+        <div>• Click and drag to interact with water</div>
+        <div>• Use the control panel to adjust parameters</div>
+        <div id="status">Initializing...</div>
+    </div>
+    
+    <div class="controls-panel" id="controls-panel">
+        <button id="collapse-button" class="collapse-button">−</button>
+        <div class="controls-title">Simulation Controls</div>
+        
+        <div class="control-group">
+            <div class="control-group-title">Appearance</div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Particle Size</span>
+                    <span class="slider-value" id="particle-size-value">0.30</span>
+                </div>
+                <input type="range" id="particle-size" class="slider" min="0.1" max="0.8" step="0.05" value="0.3">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Particle Count</span>
+                    <span class="slider-value" id="particle-count-value">2000</span>
+                </div>
+                <input type="range" id="particle-count" class="slider" min="500" max="4000" step="100" value="2000">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Container Size</span>
+                    <span class="slider-value" id="container-size-value">16.0</span>
+                </div>
+                <input type="range" id="container-size" class="slider" min="10" max="30" step="1" value="16">
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <div class="control-group-title">Physics</div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Gravity Strength</span>
+                    <span class="slider-value" id="gravity-value">0.15</span>
+                </div>
+                <input type="range" id="gravity" class="slider" min="0" max="0.5" step="0.01" value="0.15">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Viscosity (Stickiness)</span>
+                    <span class="slider-value" id="viscosity-value">0.8</span>
+                </div>
+                <input type="range" id="viscosity" class="slider" min="0.1" max="2" step="0.1" value="0.8">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Stiffness (Pressure)</span>
+                    <span class="slider-value" id="stiffness-value">0.3</span>
+                </div>
+                <input type="range" id="stiffness" class="slider" min="0.1" max="1" step="0.05" value="0.3">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Damping (Energy Loss)</span>
+                    <span class="slider-value" id="damping-value">0.95</span>
+                </div>
+                <input type="range" id="damping" class="slider" min="0.8" max="0.999" step="0.001" value="0.95">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Boundary Damping</span>
+                    <span class="slider-value" id="boundary-damping-value">0.3</span>
+                </div>
+                <input type="range" id="boundary-damping" class="slider" min="0" max="0.9" step="0.05" value="0.3">
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <div class="control-group-title">Interaction</div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Mouse Influence Radius</span>
+                    <span class="slider-value" id="mouse-radius-value">2.5</span>
+                </div>
+                <input type="range" id="mouse-radius" class="slider" min="1" max="10" step="0.5" value="2.5">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span class="slider-name">Mouse Force Strength</span>
+                    <span class="slider-value" id="mouse-strength-value">0.7</span>
+                </div>
+                <input type="range" id="mouse-strength" class="slider" min="0.1" max="2" step="0.1" value="0.7">
+            </div>
+        </div>
+        
+        <div class="button-container">
+            <button id="reset-button" class="reset-button">Reset Simulation</button>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // OrbitControls implementation
+        class OrbitControls {
+            constructor(camera, domElement) {
+                this.camera = camera;
+                this.domElement = domElement;
+                this.target = new THREE.Vector3();
+                
+                this.enableDamping = true;
+                this.dampingFactor = 0.05;
+                this.rotateSpeed = 1.0;
+                this.zoomSpeed = 1.0;
+                this.maxDistance = 100;
+                this.minDistance = 5;
+                this.maxPolarAngle = Math.PI * 0.9;
+                this.minPolarAngle = 0.1;
+                
+                // Internal state
+                this.spherical = new THREE.Spherical();
+                this.sphericalDelta = new THREE.Spherical();
+                this.scale = 1;
+                this.zoomFrag = 0;
+                this.isRotating = false;
+                this.isZooming = false;
+                
+                // Initial position
+                const position = this.camera.position.clone();
+                this.spherical.setFromVector3(position.sub(this.target));
+                
+                // Event listeners
+                this.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
+                document.addEventListener('mouseup', this.onMouseUp.bind(this));
+                document.addEventListener('mousemove', this.onMouseMove.bind(this));
+                this.domElement.addEventListener('wheel', this.onMouseWheel.bind(this));
+            }
+            
+            onMouseDown(event) {
+                if (event.button === 0) { // Left click
+                    this.isRotating = true;
+                    this.rotateStart = {
+                        x: event.clientX,
+                        y: event.clientY
+                    };
+                }
+            }
+            
+            onMouseUp() {
+                this.isRotating = false;
+            }
+            
+            onMouseMove(event) {
+                if (this.isRotating) {
+                    const deltaX = event.clientX - this.rotateStart.x;
+                    const deltaY = event.clientY - this.rotateStart.y;
+                    
+                    // Update rotation
+                    this.sphericalDelta.theta -= 2 * Math.PI * deltaX / this.domElement.clientWidth * this.rotateSpeed;
+                    this.sphericalDelta.phi -= 2 * Math.PI * deltaY / this.domElement.clientHeight * this.rotateSpeed;
+                    
+                    this.rotateStart.x = event.clientX;
+                    this.rotateStart.y = event.clientY;
+                }
+            }
+            
+            onMouseWheel(event) {
+                event.preventDefault();
+                
+                if (event.deltaY < 0) {
+                    this.scale *= 0.9; // Zoom in
+                } else {
+                    this.scale *= 1.1; // Zoom out
+                }
+            }
+            
+            update() {
+                // Apply rotation
+                this.spherical.theta += this.sphericalDelta.theta * this.dampingFactor;
+                this.spherical.phi += this.sphericalDelta.phi * this.dampingFactor;
+                
+                // Apply damping
+                this.sphericalDelta.theta *= (1 - this.dampingFactor);
+                this.sphericalDelta.phi *= (1 - this.dampingFactor);
+                
+                // Restrict phi within bounds
+                this.spherical.phi = Math.max(this.minPolarAngle, Math.min(this.maxPolarAngle, this.spherical.phi));
+                
+                // Apply scale (zoom)
+                this.spherical.radius *= this.scale;
+                this.spherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, this.spherical.radius));
+                this.scale = 1;
+                
+                // Update camera position
+                const offset = new THREE.Vector3();
+                offset.setFromSpherical(this.spherical);
+                offset.add(this.target);
+                
+                this.camera.position.copy(offset);
+                this.camera.lookAt(this.target);
+                
+                return false;
+            }
+        }
+
+        // Fluid Simulation Class
+        class FluidSimulation3D {
+            constructor() {
+                this.statusElement = document.getElementById('status');
+                this.updateStatus("Setting up simulation...");
+                
+                // Default simulation parameters - can be changed through UI
+                this.params = {
+                    particleCount: 2000,
+                    particleSize: 0.3,
+                    containerSize: 16,
+                    restDensity: 6.0,
+                    stiffness: 0.3,
+                    viscosity: 0.8,
+                    gravity: 0.15,
+                    mouseRadius: 2.5,
+                    mouseStrength: 0.7,
+                    damping: 0.95,
+                    boundaryDamping: 0.3
+                };
+                
+                this.recreateParticlesNeeded = false;
+                this.recreateContainerNeeded = false;
+                
+                // Simulation state
+                this.particles = [];
+                this.velocities = [];
+                this.forces = [];
+                this.densities = [];
+                
+                // Spatial partitioning
+                this.cellSize = 1.0;
+                this.grid = {};
+                
+                // Mouse interaction
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                this.mousePosition3D = new THREE.Vector3();
+                this.prevMousePosition3D = new THREE.Vector3();
+                this.mouseVelocity = new THREE.Vector3();
+                this.isMouseDown = false;
+                this.intersectionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1));
+                
+                try {
+                    this.init();
+                    this.updateStatus("Simulation running");
+                    this.hideLoadingScreen();
+                    this.setupUIControls();
+                } catch (error) {
+                    console.error("Initialization error:", error);
+                    this.updateStatus("Error: " + error.message);
+                }
+            }
+            
+            updateStatus(message) {
+                if (this.statusElement) {
+                    this.statusElement.textContent = message;
+                }
+                console.log(message);
+            }
+            
+            hideLoadingScreen() {
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.opacity = '0';
+                    loadingScreen.style.transition = 'opacity 0.5s';
+                    setTimeout(() => {
+                        loadingScreen.style.display = 'none';
+                    }, 500);
+                }
+            }
+            
+            setupUIControls() {
+                // Set up UI controls
+                const controls = {
+                    // Appearance
+                    particleSize: document.getElementById('particle-size'),
+                    particleSizeValue: document.getElementById('particle-size-value'),
+                    particleCount: document.getElementById('particle-count'),
+                    particleCountValue: document.getElementById('particle-count-value'),
+                    containerSize: document.getElementById('container-size'),
+                    containerSizeValue: document.getElementById('container-size-value'),
+                    
+                    // Physics
+                    gravity: document.getElementById('gravity'),
+                    gravityValue: document.getElementById('gravity-value'),
+                    viscosity: document.getElementById('viscosity'),
+                    viscosityValue: document.getElementById('viscosity-value'),
+                    stiffness: document.getElementById('stiffness'),
+                    stiffnessValue: document.getElementById('stiffness-value'),
+                    damping: document.getElementById('damping'),
+                    dampingValue: document.getElementById('damping-value'),
+                    boundaryDamping: document.getElementById('boundary-damping'),
+                    boundaryDampingValue: document.getElementById('boundary-damping-value'),
+                    
+                    // Interaction
+                    mouseRadius: document.getElementById('mouse-radius'),
+                    mouseRadiusValue: document.getElementById('mouse-radius-value'),
+                    mouseStrength: document.getElementById('mouse-strength'),
+                    mouseStrengthValue: document.getElementById('mouse-strength-value'),
+                    
+                    // Buttons
+                    resetButton: document.getElementById('reset-button'),
+                    collapseButton: document.getElementById('collapse-button')
+                };
+                
+                // Initialize sliders with current values
+                controls.particleSize.value = this.params.particleSize;
+                controls.particleSizeValue.textContent = this.params.particleSize.toFixed(2);
+                
+                controls.particleCount.value = this.params.particleCount;
+                controls.particleCountValue.textContent = this.params.particleCount;
+                
+                controls.containerSize.value = this.params.containerSize;
+                controls.containerSizeValue.textContent = this.params.containerSize.toFixed(1);
+                
+                controls.gravity.value = this.params.gravity;
+                controls.gravityValue.textContent = this.params.gravity.toFixed(2);
+                
+                controls.viscosity.value = this.params.viscosity;
+                controls.viscosityValue.textContent = this.params.viscosity.toFixed(1);
+                
+                controls.stiffness.value = this.params.stiffness;
+                controls.stiffnessValue.textContent = this.params.stiffness.toFixed(2);
+                
+                controls.damping.value = this.params.damping;
+                controls.dampingValue.textContent = this.params.damping.toFixed(3);
+                
+                controls.boundaryDamping.value = this.params.boundaryDamping;
+                controls.boundaryDampingValue.textContent = this.params.boundaryDamping.toFixed(2);
+                
+                controls.mouseRadius.value = this.params.mouseRadius;
+                controls.mouseRadiusValue.textContent = this.params.mouseRadius.toFixed(1);
+                
+                controls.mouseStrength.value = this.params.mouseStrength;
+                controls.mouseStrengthValue.textContent = this.params.mouseStrength.toFixed(1);
+                
+                // Set up event listeners for controls
+                controls.particleSize.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.particleSize.value);
+                    controls.particleSizeValue.textContent = newValue.toFixed(2);
+                    this.params.particleSize = newValue;
+                    this.recreateParticlesNeeded = true;
+                });
+                
+                controls.particleCount.addEventListener('input', () => {
+                    const newValue = parseInt(controls.particleCount.value);
+                    controls.particleCountValue.textContent = newValue;
+                    this.params.particleCount = newValue;
+                    this.recreateParticlesNeeded = true;
+                });
+                
+                controls.containerSize.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.containerSize.value);
+                    controls.containerSizeValue.textContent = newValue.toFixed(1);
+                    this.params.containerSize = newValue;
+                    this.recreateContainerNeeded = true;
+                });
+                
+                controls.gravity.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.gravity.value);
+                    controls.gravityValue.textContent = newValue.toFixed(2);
+                    this.params.gravity = newValue;
+                });
+                
+                controls.viscosity.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.viscosity.value);
+                    controls.viscosityValue.textContent = newValue.toFixed(1);
+                    this.params.viscosity = newValue;
+                });
+                
+                controls.stiffness.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.stiffness.value);
+                    controls.stiffnessValue.textContent = newValue.toFixed(2);
+                    this.params.stiffness = newValue;
+                });
+                
+                controls.damping.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.damping.value);
+                    controls.dampingValue.textContent = newValue.toFixed(3);
+                    this.params.damping = newValue;
+                });
+                
+                controls.boundaryDamping.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.boundaryDamping.value);
+                    controls.boundaryDampingValue.textContent = newValue.toFixed(2);
+                    this.params.boundaryDamping = newValue;
+                });
+                
+                controls.mouseRadius.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.mouseRadius.value);
+                    controls.mouseRadiusValue.textContent = newValue.toFixed(1);
+                    this.params.mouseRadius = newValue;
+                });
+                
+                controls.mouseStrength.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.mouseStrength.value);
+                    controls.mouseStrengthValue.textContent = newValue.toFixed(1);
+                    this.params.mouseStrength = newValue;
+                });
+                
+                // Reset button
+                controls.resetButton.addEventListener('click', () => {
+                    this.resetSimulation();
+                });
+                
+                // Panel collapse functionality
+                let panelCollapsed = false;
+                const controlsPanel = document.getElementById('controls-panel');
+                
+                controls.collapseButton.addEventListener('click', () => {
+                    if (panelCollapsed) {
+                        controlsPanel.style.width = '300px';
+                        controlsPanel.style.height = 'auto';
+                        controls.collapseButton.textContent = '−';
+                        
+                        // Show all content except the button
+                        Array.from(controlsPanel.children).forEach(child => {
+                            if (child !== controls.collapseButton) {
+                                child.style.display = 'block';
+                            }
+                        });
+                    } else {
+                        controlsPanel.style.width = '40px';
+                        controlsPanel.style.height = '40px';
+                        controls.collapseButton.textContent = '+';
+                        
+                        // Hide all content except the button
+                        Array.from(controlsPanel.children).forEach(child => {
+                            if (child !== controls.collapseButton) {
+                                child.style.display = 'none';
+                            }
+                        });
+                    }
+                    
+                    panelCollapsed = !panelCollapsed;
+                });
+            }
+            
+            resetSimulation() {
+                this.updateStatus("Resetting simulation...");
+                
+                // Clear existing particles
+                this.clearParticles();
+                
+                // Recreate container if needed
+                if (this.recreateContainerNeeded) {
+                    this.clearContainer();
+                    this.createContainer();
+                    this.recreateContainerNeeded = false;
+                }
+                
+                // Recreate particles
+                this.initParticles();
+                this.recreateParticlesNeeded = false;
+                
+                this.updateStatus("Simulation reset complete");
+            }
+            
+            clearParticles() {
+                // Remove particles from scene
+                if (this.container) {
+                    // Keep the first 6 children (container box and panels)
+                    while (this.container.children.length > 6) {
+                        const particle = this.container.children[6];
+                        this.container.remove(particle);
+                        if (particle.geometry) particle.geometry.dispose();
+                        if (particle.material) particle.material.dispose();
+                    }
+                }
+                
+                // Reset particle arrays
+                this.particles = [];
+                this.velocities = [];
+                this.forces = [];
+                this.densities = [];
+            }
+            
+            clearContainer() {
+                if (this.container) {
+                    while (this.container.children.length > 0) {
+                        const child = this.container.children[0];
+                        this.container.remove(child);
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) child.material.dispose();
+                    }
+                }
+            }
+            
+            init() {
+                this.updateStatus("Initializing renderer...");
+                this.initRenderer();
+                
+                this.updateStatus("Setting up lighting...");
+                this.initLights();
+                
+                this.updateStatus("Creating container...");
+                this.createContainer();
+                
+                this.updateStatus("Creating particles...");
+                this.initParticles();
+                
+                this.updateStatus("Setting up controls...");
+                this.setupControls();
+                
+                // Set up event listeners
+                window.addEventListener('resize', this.onWindowResize.bind(this));
+                this.renderer.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
+                this.renderer.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
+                document.addEventListener('mouseup', this.onMouseUp.bind(this));
+                
+                // Start animation loop
+                this.animate();
+            }
+            
+            initRenderer() {
+                // Set up three.js scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0xf0f0f0);
+                
+                // Set up camera
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+                this.camera.position.set(20, 20, 20);
+                this.camera.lookAt(0, 0, 0);
+                
+                // Set up renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.body.appendChild(this.renderer.domElement);
+                
+                // Add fog for depth perception
+                this.scene.fog = new THREE.Fog(0xf0f0f0, 20, 100);
+            }
+            
+            initLights() {
+                // Main directional light
+                const mainLight = new THREE.DirectionalLight(0xffffff, 0.7);
+                mainLight.position.set(10, 20, 15);
+                mainLight.castShadow = true;
+                
+                mainLight.shadow.camera.left = -30;
+                mainLight.shadow.camera.right = 30;
+                mainLight.shadow.camera.top = 30;
+                mainLight.shadow.camera.bottom = -30;
+                mainLight.shadow.camera.near = 0.1;
+                mainLight.shadow.camera.far = 100;
+                mainLight.shadow.mapSize.width = 1024;
+                mainLight.shadow.mapSize.height = 1024;
+                this.scene.add(mainLight);
+                
+                // Ambient light
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+                this.scene.add(ambientLight);
+                
+                // Fill light for better visibility
+                const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+                fillLight.position.set(-10, 5, -10);
+                this.scene.add(fillLight);
+            }
+            
+            createContainer() {
+                const size = this.params.containerSize;
+                const halfSize = size / 2;
+                
+                // Create a group for the container
+                this.container = new THREE.Group();
+                this.scene.add(this.container);
+                
+                // Create box edges with thicker lines
+                const boxGeometry = new THREE.BoxGeometry(size, size, size);
+                const boxEdges = new THREE.EdgesGeometry(boxGeometry);
+                const edgeMaterial = new THREE.LineBasicMaterial({ 
+                    color: 0x444444, 
+                    opacity: 0.7, 
+                    transparent: true,
+                    linewidth: 1.5
+                });
+                const boxOutline = new THREE.LineSegments(boxEdges, edgeMaterial);
+                this.container.add(boxOutline);
+                
+                // Create semi-transparent sides
+                const panelMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x6baed6,
+                    opacity: 0.1,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                });
+                
+                // Bottom panel
+                const bottomPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    panelMaterial.clone()
+                );
+                bottomPanel.rotation.x = Math.PI / 2;
+                bottomPanel.position.y = -halfSize;
+                this.container.add(bottomPanel);
+                
+                // Side panels (slightly visible)
+                const sidePanelMaterial = panelMaterial.clone();
+                sidePanelMaterial.opacity = 0.05;
+                
+                // Front panel (z+)
+                const frontPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    sidePanelMaterial
+                );
+                frontPanel.position.z = halfSize;
+                this.container.add(frontPanel);
+                
+                // Back panel (z-)
+                const backPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    sidePanelMaterial
+                );
+                backPanel.position.z = -halfSize;
+                backPanel.rotation.y = Math.PI;
+                this.container.add(backPanel);
+                
+                // Left panel (x-)
+                const leftPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    sidePanelMaterial
+                );
+                leftPanel.position.x = -halfSize;
+                leftPanel.rotation.y = Math.PI / 2;
+                this.container.add(leftPanel);
+                
+                // Right panel (x+)
+                const rightPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    sidePanelMaterial
+                );
+                rightPanel.position.x = halfSize;
+                rightPanel.rotation.y = -Math.PI / 2;
+                this.container.add(rightPanel);
+                
+                // Ground plane for shadows
+                if (this.groundPlane) {
+                    this.scene.remove(this.groundPlane);
+                }
+                
+                this.groundPlane = new THREE.Mesh(
+                    new THREE.PlaneGeometry(100, 100),
+                    new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.9 })
+                );
+                this.groundPlane.rotation.x = -Math.PI / 2;
+                this.groundPlane.position.y = -halfSize - 0.01;
+                this.groundPlane.receiveShadow = true;
+                this.scene.add(this.groundPlane);
+            }
+            
+            initParticles() {
+                // Create particle geometry
+                const geometry = new THREE.SphereGeometry(this.params.particleSize, 8, 6);
+                
+                // Water material
+                const waterMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x3498db,
+                    metalness: 0.1,
+                    roughness: 0.2,
+                    transparent: true,
+                    opacity: 0.8,
+                    clearcoat: 0.5
+                });
+                
+                // Calculate dimensions to fill approximately half the box
+                const halfSize = this.params.containerSize / 2;
+                const boxVolume = this.params.containerSize * this.params.containerSize * this.params.containerSize;
+                const targetVolume = boxVolume * 0.5; // Fill about half the container
+                
+                // Estimate spacing based on particle size and volume
+                const particleVolume = (4/3) * Math.PI * Math.pow(this.params.particleSize, 3);
+                const totalParticleVolume = particleVolume * this.params.particleCount;
+                const density = targetVolume / totalParticleVolume;
+                const spacing = this.params.particleSize * 2.2 * Math.pow(density, 1/3);
+                
+                // Calculate 3D grid dimensions for particle placement
+                const particlesPerSide = Math.cbrt(this.params.particleCount);
+                const sideLength = particlesPerSide * spacing;
+                
+                // Calculate dimensions for a cuboid that fills half the container
+                const fillHeight = halfSize * 0.95; // Fill slightly less than half the height
+                
+                // Calculate particles per dimension to create a rectangular prism
+                const particlesY = Math.floor(fillHeight / spacing);
+                const particlesXZ = Math.ceil(Math.sqrt(this.params.particleCount / particlesY));
+                
+                // Calculate starting position to center the particles
+                const startX = -halfSize + spacing/2;
+                const startY = -halfSize + spacing/2; // Start from bottom
+                const startZ = -halfSize + spacing/2;
+                
+                // Create particles in a 3D grid formation
+                let particleIndex = 0;
+                for (let y = 0; y < particlesY && particleIndex < this.params.particleCount; y++) {
+                    for (let x = 0; x < particlesXZ && particleIndex < this.params.particleCount; x++) {
+                        for (let z = 0; z < particlesXZ && particleIndex < this.params.particleCount; z++) {
+                            // Calculate position with small random offset
+                            const xPos = startX + x * spacing + (Math.random() * 0.2 - 0.1) * spacing;
+                            const yPos = startY + y * spacing + (Math.random() * 0.2 - 0.1) * spacing;
+                            const zPos = startZ + z * spacing + (Math.random() * 0.2 - 0.1) * spacing;
+                            
+                            // Skip particles outside the container bounds
+                            if (xPos > halfSize || yPos > halfSize || zPos > halfSize ||
+                                xPos < -halfSize || yPos < -halfSize || zPos < -halfSize) {
+                                continue;
+                            }
+                            
+                            // Create particle mesh
+                            const particle = new THREE.Mesh(geometry, waterMaterial.clone());
+                            particle.position.set(xPos, yPos, zPos);
+                            particle.castShadow = true;
+                            particle.receiveShadow = true;
+                            this.container.add(particle);
+                            
+                            // Store particle data
+                            this.particles.push(particle.position);
+                            this.velocities.push(new THREE.Vector3(0, 0, 0));
+                            this.forces.push(new THREE.Vector3(0, 0, 0));
+                            this.densities.push(0);
+                            
+                            particleIndex++;
+                            
+                            // Stop if we've created enough particles
+                            if (particleIndex >= this.params.particleCount) break;
+                        }
+                        if (particleIndex >= this.params.particleCount) break;
+                    }
+                    if (particleIndex >= this.params.particleCount) break;
+                }
+                
+                // Log the actual number of particles created
+                this.updateStatus(`Created ${particleIndex} particles`);
+            }
+            
+            updateGrid() {
+                // Clear spatial grid
+                this.grid = {};
+                
+                // Add particles to grid
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p = this.particles[i];
+                    const halfSize = this.params.containerSize / 2;
+                    
+                    // Convert to grid coordinates
+                    const nx = Math.floor((p.x + halfSize) / this.cellSize);
+                    const ny = Math.floor((p.y + halfSize) / this.cellSize);
+                    const nz = Math.floor((p.z + halfSize) / this.cellSize);
+                    
+                    // Generate unique key
+                    const key = `${nx},${ny},${nz}`;
+                    
+                    if (!this.grid[key]) {
+                        this.grid[key] = [];
+                    }
+                    
+                    this.grid[key].push(i);
+                }
+            }
+            
+            getNeighbors(particleIndex) {
+                const neighbors = [];
+                const p = this.particles[particleIndex];
+                const halfSize = this.params.containerSize / 2;
+                
+                // Convert to grid coordinates
+                const cellX = Math.floor((p.x + halfSize) / this.cellSize);
+                const cellY = Math.floor((p.y + halfSize) / this.cellSize);
+                const cellZ = Math.floor((p.z + halfSize) / this.cellSize);
+                
+                // Search surrounding cells (27 cells total including current cell)
+                for (let x = cellX - 1; x <= cellX + 1; x++) {
+                    for (let y = cellY - 1; y <= cellY + 1; y++) {
+                        for (let z = cellZ - 1; z <= cellZ + 1; z++) {
+                            const key = `${x},${y},${z}`;
+                            
+                            if (this.grid[key]) {
+                                for (const neighborIdx of this.grid[key]) {
+                                    if (neighborIdx !== particleIndex) {
+                                        const nx = this.particles[neighborIdx].x;
+                                        const ny = this.particles[neighborIdx].y;
+                                        const nz = this.particles[neighborIdx].z;
+                                        
+                                        const dx = nx - p.x;
+                                        const dy = ny - p.y;
+                                        const dz = nz - p.z;
+                                        
+                                        const distSq = dx * dx + dy * dy + dz * dz;
+                                        const radius = 2 * this.cellSize;
+                                        
+                                        if (distSq < radius * radius) {
+                                            neighbors.push({
+                                                index: neighborIdx,
+                                                distance: Math.sqrt(distSq)
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return neighbors;
+            }
+            
+            // Smoothing kernel for SPH (Poly6)
+            kernel(r) {
+                const h = 2 * this.cellSize;
+                if (r >= h) return 0;
+                
+                const h2 = h * h;
+                const term = h2 - r * r;
+                return 315.0 / (64.0 * Math.PI * Math.pow(h, 9)) * term * term * term;
+            }
+            
+            // Gradient of kernel
+            gradKernel(r, direction) {
+                const h = 2 * this.cellSize;
+                if (r >= h) return new THREE.Vector3();
+                
+                const factor = -45.0 / (Math.PI * Math.pow(h, 6)) * Math.pow(h - r, 2) / r;
+                return direction.multiplyScalar(factor);
+            }
+            
+            // Laplacian of kernel
+            laplaceKernel(r) {
+                const h = 2 * this.cellSize;
+                if (r >= h) return 0;
+                
+                return 45.0 / (Math.PI * Math.pow(h, 6)) * (h - r);
+            }
+            
+            update() {
+                // Check if we need to recreate the simulation
+                if (this.recreateParticlesNeeded || this.recreateContainerNeeded) {
+                    this.resetSimulation();
+                    return;
+                }
+                
+                // Update spatial partitioning
+                this.updateGrid();
+                
+                // Calculate densities
+                for (let i = 0; i < this.particles.length; i++) {
+                    this.densities[i] = 0;
+                    
+                    // Self-contribution
+                    this.densities[i] += this.kernel(0);
+                    
+                    // Neighbor contributions
+                    const neighbors = this.getNeighbors(i);
+                    for (const neighbor of neighbors) {
+                        this.densities[i] += this.kernel(neighbor.distance);
+                    }
+                }
+                
+                // Calculate forces
+                for (let i = 0; i < this.particles.length; i++) {
+                    // Reset forces
+                    this.forces[i].set(0, 0, 0);
+                    
+                    // Apply gravity
+                    this.forces[i].add(new THREE.Vector3(0, -this.params.gravity, 0));
+                    
+                    const p = this.particles[i];
+                    const neighbors = this.getNeighbors(i);
+                    
+                    // Calculate pressure and viscosity forces
+                    for (const neighbor of neighbors) {
+                        const j = neighbor.index;
+                        const r = neighbor.distance;
+                        
+                        if (r > 0) {
+                            // Direction vector
+                            const direction = new THREE.Vector3()
+                                .subVectors(this.particles[j], p)
+                                .normalize();
+                            
+                            // Pressure force (prevent clustering)
+                            const pressureI = Math.max(0, this.densities[i] - this.params.restDensity);
+                            const pressureJ = Math.max(0, this.densities[j] - this.params.restDensity);
+                            const pressureTerm = (pressureI + pressureJ) / (2 * this.densities[j]);
+                            
+                            const gradW = this.gradKernel(r, direction.clone());
+                            const pressureForce = gradW.multiplyScalar(-this.params.stiffness * pressureTerm);
+                            this.forces[i].add(pressureForce);
+                            
+                            // Viscosity force (smooth velocity differences)
+                            const relativeVelocity = new THREE.Vector3()
+                                .subVectors(this.velocities[j], this.velocities[i]);
+                            
+                            const viscosityForce = relativeVelocity.multiplyScalar(
+                                this.params.viscosity * this.laplaceKernel(r) / this.densities[j]
+                            );
+                            
+                            this.forces[i].add(viscosityForce);
+                        }
+                    }
+                }
+                
+                // Apply mouse interaction
+                if (this.isMouseDown && this.mouseVelocity.length() > 0.01) {
+                    for (let i = 0; i < this.particles.length; i++) {
+                        const p = this.particles[i];
+                        const dist = p.distanceTo(this.mousePosition3D);
+                        
+                        if (dist < this.params.mouseRadius) {
+                            const factor = (1 - dist / this.params.mouseRadius) * this.params.mouseStrength;
+                            const force = this.mouseVelocity.clone().multiplyScalar(factor);
+                            this.forces[i].add(force);
+                        }
+                    }
+                }
+                
+                // Integrate and apply boundary conditions
+                const halfSize = this.params.containerSize / 2;
+                
+                for (let i = 0; i < this.particles.length; i++) {
+                    // Update velocity
+                    this.velocities[i].add(this.forces[i]);
+                    
+                    // Apply damping
+                    this.velocities[i].multiplyScalar(this.params.damping);
+                    
+                    // Update position
+                    this.particles[i].add(this.velocities[i]);
+                    
+                    // Handle boundaries
+                    if (this.particles[i].x < -halfSize) {
+                        this.particles[i].x = -halfSize;
+                        this.velocities[i].x *= -this.params.boundaryDamping;
+                    } else if (this.particles[i].x > halfSize) {
+                        this.particles[i].x = halfSize;
+                        this.velocities[i].x *= -this.params.boundaryDamping;
+                    }
+                    
+                    if (this.particles[i].y < -halfSize) {
+                        this.particles[i].y = -halfSize;
+                        this.velocities[i].y *= -this.params.boundaryDamping;
+                    } else if (this.particles[i].y > halfSize) {
+                        this.particles[i].y = halfSize;
+                        this.velocities[i].y *= -this.params.boundaryDamping;
+                    }
+                    
+                    if (this.particles[i].z < -halfSize) {
+                        this.particles[i].z = -halfSize;
+                        this.velocities[i].z *= -this.params.boundaryDamping;
+                    } else if (this.particles[i].z > halfSize) {
+                        this.particles[i].z = halfSize;
+                        this.velocities[i].z *= -this.params.boundaryDamping;
+                    }
+                    
+                    // Update material based on velocity
+                    const speed = this.velocities[i].length();
+                    const particle = this.container.children[i + 6]; // +6 to skip container box and panels
+                    
+                    if (particle && particle.material) {
+                        // Adjust color based on speed
+                        const hue = 0.58 + Math.min(speed * 0.05, 0.1);
+                        const saturation = 0.7 - Math.min(speed * 0.2, 0.3);
+                        const lightness = 0.5 + Math.min(speed * 0.3, 0.3);
+                        
+                        particle.material.color.setHSL(hue, saturation, lightness);
+                    }
+                }
+            }
+            
+            setupControls() {
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+            }
+            
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                try {
+                    // Update controls
+                    if (this.controls) {
+                        this.controls.update();
+                    }
+                    
+                    // Update simulation
+                    this.update();
+                    
+                    // Render scene
+                    this.renderer.render(this.scene, this.camera);
+                } catch (error) {
+                    console.error("Animation error:", error);
+                    this.updateStatus("Animation error: " + error.message);
+                }
+            }
+            
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            onMouseMove(event) {
+                // Check if mouse is over controls panel and ignore if it is
+                const controlsPanel = document.getElementById('controls-panel');
+                const rect = controlsPanel.getBoundingClientRect();
+                if (
+                    event.clientX >= rect.left && 
+                    event.clientX <= rect.right && 
+                    event.clientY >= rect.top && 
+                    event.clientY <= rect.bottom
+                ) {
+                    return;
+                }
+                
+                // Convert mouse position to normalized device coordinates
+                this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Cast ray from camera
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                
+                // Save previous position
+                this.prevMousePosition3D.copy(this.mousePosition3D);
+                
+                // Update intersection plane to face camera
+                this.intersectionPlane.normal.copy(this.camera.getWorldDirection(new THREE.Vector3()).negate());
+                
+                // Find intersection with the plane
+                const intersects = new THREE.Vector3();
+                if (this.raycaster.ray.intersectPlane(this.intersectionPlane, intersects)) {
+                    this.mousePosition3D.copy(intersects);
+                    
+                    // Calculate velocity
+                    this.mouseVelocity.subVectors(this.mousePosition3D, this.prevMousePosition3D);
+                }
+            }
+            
+            onMouseDown(event) {
+                // Check if mouse is over controls panel and ignore if it is
+                const controlsPanel = document.getElementById('controls-panel');
+                const rect = controlsPanel.getBoundingClientRect();
+                if (
+                    event.clientX >= rect.left && 
+                    event.clientX <= rect.right && 
+                    event.clientY >= rect.top && 
+                    event.clientY <= rect.bottom
+                ) {
+                    return;
+                }
+                
+                this.isMouseDown = true;
+                this.onMouseMove(event);
+                this.prevMousePosition3D.copy(this.mousePosition3D);
+            }
+            
+            onMouseUp() {
+                this.isMouseDown = false;
+            }
+        }
+
+        // Start simulation when page loads
+        window.addEventListener('load', () => {
+            try {
+                new FluidSimulation3D();
+            } catch (error) {
+                console.error("Failed to start simulation:", error);
+                document.getElementById('status').textContent = "Failed to start: " + error.message;
+                
+                // Hide loading screen even on error
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
