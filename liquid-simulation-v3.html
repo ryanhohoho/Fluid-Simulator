@@ -512,8 +512,6 @@
             <div class="preset-buttons">
                 <button class="preset-btn active" id="preset-water">Water</button>
                 <button class="preset-btn" id="preset-blocks">Block Test</button>
-                <button class="preset-btn" id="preset-spheres" onclick="applyPreset('spheres')">Spheres</button>
-
             </div>
         </div>
 
@@ -1181,194 +1179,6 @@
             // and implement the core simulation steps
         }
         
-        // presets buttons
-        function applyPreset(presetName) {
-            // Update active button styling
-            document.querySelectorAll('.preset-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // Find the button for this preset and activate it
-            const presetButton = document.getElementById(`preset-${presetName}`);
-            if (presetButton) {
-                presetButton.classList.add('active');
-            }
-            
-            if (presetName === 'water') {
-                // Blue water-like fluid
-                particleMaterial.color.set(0x2389da);
-                particleMaterial.size = params.sphereRadius * 2;
-                particleMaterial.opacity = 0.6;
-                particleMaterial.blending = THREE.AdditiveBlending;
-                
-                // Update sliders
-                document.getElementById('fluidity').value = 0.95;
-                document.getElementById('fluidity-value').textContent = "0.95";
-                params.flipness = 0.95;
-                
-                document.getElementById('speed').value = 0.4; // Lower speed
-                document.getElementById('speed-value').textContent = "0.4";
-                params.timeScale = 0.4;
-                
-                // Calm fluid-specific parameters
-                params.viscosity = 2.5;        // Very high viscosity for better settling
-                params.pressureStiffness = 20.0; // Higher pressure to maintain spacing
-                params.surfaceTension = 1.0;   // Moderate surface tension
-                params.restitution = 0.05;     // Almost no bounce
-            } else if (presetName === 'blocks') {
-                // More viscous, blocky fluid
-                particleMaterial.color.set(0xdddddd);
-                particleMaterial.size = params.sphereRadius * 1.5;
-                particleMaterial.opacity = 0.8;
-                particleMaterial.blending = THREE.NormalBlending;
-                
-                // Update sliders
-                document.getElementById('fluidity').value = 0.7;
-                document.getElementById('fluidity-value').textContent = "0.70";
-                params.flipness = 0.7;
-                
-                document.getElementById('speed').value = 0.4; // Lower speed
-                document.getElementById('speed-value').textContent = "0.4";
-                params.timeScale = 0.4;
-                
-                // Block-specific parameters
-                params.viscosity = 3.0;        // Even more viscous
-                params.pressureStiffness = 30.0; // Stronger pressure
-                params.surfaceTension = 1.5;   // Stronger surface tension
-                params.restitution = 0.05;     // Almost no bounce
-            } else if (presetName === 'spheres') {
-                // Perfect spherical appearance
-                particleMaterial.color.set(0x4fadff);
-                particleMaterial.size = params.sphereRadius * 2.5;
-                particleMaterial.opacity = 0.9;
-                particleMaterial.blending = THREE.NormalBlending;
-                
-                // Enable depth write for more solid-looking spheres
-                particleMaterial.depthWrite = true;
-                
-                // Update sliders
-                document.getElementById('fluidity').value = 0.85;
-                document.getElementById('fluidity-value').textContent = "0.85";
-                params.flipness = 0.85;
-                
-                document.getElementById('speed').value = 0.4; // Lower speed
-                document.getElementById('speed-value').textContent = "0.4";
-                params.timeScale = 0.4;
-                
-                // Sphere-specific parameters
-                params.viscosity = 2.0;        // Higher viscosity
-                params.pressureStiffness = 25.0; // Higher pressure
-                params.surfaceTension = 2.0;   // High surface tension for spherical shape
-                params.restitution = 0.05;     // Almost no bounce
-            } else if (presetName === 'static') {
-                // Static water that barely moves
-                particleMaterial.color.set(0x00aaff);
-                particleMaterial.size = params.sphereRadius * 2;
-                particleMaterial.opacity = 0.7;
-                particleMaterial.blending = THREE.AdditiveBlending;
-                
-                // Update sliders
-                document.getElementById('fluidity').value = 0.6; // Lower FLIP value for more stability
-                document.getElementById('fluidity-value').textContent = "0.60";
-                params.flipness = 0.6;
-                
-                document.getElementById('speed').value = 0.2; // Very low speed
-                document.getElementById('speed-value').textContent = "0.2";
-                params.timeScale = 0.2;
-                
-                // Static fluid parameters - extreme values for minimal movement
-                params.viscosity = 5.0;        // Extremely high viscosity
-                params.pressureStiffness = 40.0; // Very high pressure for rigid structure
-                params.surfaceTension = 3.0;   // Very high surface tension
-                params.restitution = 0.01;     // Practically no bounce
-            }
-            
-            updateDerivedParameters();
-            resetSimulation();
-        }
-        
-        //TEMPORARY FIX!!!!!!! extra damping should not be needed later on if properly initiated obj bounds
-        function applyExtraDamping() {
-            // Apply stronger velocity cap
-            for (let i = 0; i < params.particleCount; i++) {
-                // Detect if particle is near bottom of container
-                const py = particlePositions[i * 4 + 1];
-                const bottomDistance = py - (-params.gridHeight/2 + params.particleRadius);
-                
-                // Particles near bottom get extra damping
-                if (bottomDistance < params.particleRadius * 3) {
-                    // Apply stronger damping to particles near the bottom
-                    const bottomDamping = 0.9; // 10% velocity reduction
-                    particleVelocities[i * 4] *= bottomDamping;
-                    particleVelocities[i * 4 + 1] *= bottomDamping;
-                    particleVelocities[i * 4 + 2] *= bottomDamping;
-                    
-                    // Also apply a small downward force to keep particles on the bottom
-                    particleVelocities[i * 4 + 1] -= 0.05;
-                }
-            }
-        }
-
-        // TEMPORARY FIX!!!!! for even more extreme calming, run a separate pass to stabilize particles
-        function stabilizeFluid() {
-            // Detect when particles are in a stable configuration and almost stop them
-            // This is a heuristic that looks for particles that have settled into a layer
-            
-            // First identify which particles are in stable layers
-            const layerHeight = params.particleRadius * 2.5;
-            const layerCounts = new Array(20).fill(0); // Count particles in each layer
-            
-            // Count particles per horizontal layer
-            for (let i = 0; i < params.particleCount; i++) {
-                const py = particlePositions[i * 4 + 1];
-                const layerIndex = Math.floor((py + params.gridHeight/2) / layerHeight);
-                
-                if (layerIndex >= 0 && layerIndex < layerCounts.length) {
-                    layerCounts[layerIndex]++;
-                }
-            }
-            
-            // Identify dense layers (many particles in same horizontal slice)
-            const denseThreshold = params.particleCount / layerCounts.length * 1.5;
-            const denseLayerIndices = [];
-            
-            for (let i = 0; i < layerCounts.length; i++) {
-                if (layerCounts[i] > denseThreshold) {
-                    denseLayerIndices.push(i);
-                }
-            }
-            
-            // If we have dense layers, stabilize particles in them
-            if (denseLayerIndices.length > 0) {
-                for (let i = 0; i < params.particleCount; i++) {
-                    const py = particlePositions[i * 4 + 1];
-                    const layerIndex = Math.floor((py + params.gridHeight/2) / layerHeight);
-                    
-                    // Check if this particle is in a dense layer
-                    if (denseLayerIndices.includes(layerIndex)) {
-                        // If particle is in a dense layer, heavily damp its velocity
-                        const stabilizationFactor = 0.8; // 20% velocity reduction
-                        particleVelocities[i * 4] *= stabilizationFactor;
-                        particleVelocities[i * 4 + 1] *= stabilizationFactor;
-                        particleVelocities[i * 4 + 2] *= stabilizationFactor;
-                        
-                        // If particle is moving very slowly, stop it completely
-                        const vx = particleVelocities[i * 4];
-                        const vy = particleVelocities[i * 4 + 1];
-                        const vz = particleVelocities[i * 4 + 2];
-                        
-                        const velMagSquared = vx*vx + vy*vy + vz*vz;
-                        
-                        if (velMagSquared < 0.01) {
-                            particleVelocities[i * 4] = 0;
-                            particleVelocities[i * 4 + 1] = 0;
-                            particleVelocities[i * 4 + 2] = 0;
-                        }
-                    }
-                }
-            }
-        }
-
         // Initialize event listeners
         function initEventListeners() {
             // UI Event listeners
@@ -1377,18 +1187,9 @@
             });
             
             document.getElementById('particle-count').addEventListener('input', (e) => {
-                const newParticleCount = parseInt(e.target.value);
-                document.getElementById('particle-count-value').textContent = newParticleCount;
-                
-                // Store previous count for proper transition
-                const oldParticleCount = params.particleCount;
-                params.particleCount = newParticleCount;
-                
-                // Update derived parameters
-                updateDerivedParameters();
-                
-                // Handle the change in particle count
-                updateParticleCount(oldParticleCount, newParticleCount);
+                const value = parseInt(e.target.value);
+                document.getElementById('particle-count-value').textContent = value;
+                params.particleCount = value;
             });
             
             document.getElementById('fluidity').addEventListener('input', (e) => {
@@ -1415,19 +1216,6 @@
 
                 updateDerivedParameters();
             });
-
-
-            //TEMPORARY FIX!!!!!!
-            // document.addEventListener('DOMContentLoaded', function() {
-            //     // Find the spheres button and attach event listener directly
-            //     const spheresButton = document.getElementById('preset-spheres');
-            //     if (spheresButton) {
-            //         spheresButton.addEventListener('click', function() {
-            //             applyPreset('spheres');
-            //         });
-            //     }
-            // });
-
             
             document.getElementById('render-style').addEventListener('change', (e) => {
                 params.renderStyle = e.target.value;
@@ -1482,75 +1270,6 @@
                     dropParticleBlock();
                 }
             });
-        }
-
-        // Create a new initialization function that properly places particles
-        function initializeBlockMode() {
-            // Calculate bounds to center the particles
-            const halfWidth = params.gridWidth / 2;
-            const halfHeight = params.gridHeight / 2;
-            const halfDepth = params.gridDepth / 2;
-            
-            // Size of the block of particles (50% of grid size for a more stable configuration)
-            const blockWidth = params.gridWidth * 0.5;
-            const blockHeight = params.gridHeight * 0.3; // Lower height creates a flatter starting shape
-            const blockDepth = params.gridDepth * 0.5;
-            
-            // Calculate particle spacing for a stable configuration
-            const particleSpacing = params.particleRadius * 2.2; // Slightly larger than diameter
-            
-            // Calculate the number of particles that can fit in each dimension
-            const numX = Math.floor(blockWidth / particleSpacing);
-            const numY = Math.floor(blockHeight / particleSpacing);
-            const numZ = Math.floor(blockDepth / particleSpacing);
-            
-            // Calculate offsets to center the block
-            const offsetX = -halfWidth + (params.gridWidth - numX * particleSpacing) / 2;
-            const offsetY = -halfHeight + (params.gridHeight - numY * particleSpacing) * 0.2; // Place closer to bottom
-            const offsetZ = -halfDepth + (params.gridDepth - numZ * particleSpacing) / 2;
-            
-            // Place particles in a grid
-            let particleIndex = 0;
-            for (let y = 0; y < numY && particleIndex < params.particleCount; y++) {
-                for (let z = 0; z < numZ && particleIndex < params.particleCount; z++) {
-                    for (let x = 0; x < numX && particleIndex < params.particleCount; x++) {
-                        // Calculate position with minimal jitter (0.05 * spacing)
-                        const posX = offsetX + x * particleSpacing + (Math.random() * 0.05 - 0.025) * particleSpacing;
-                        const posY = offsetY + y * particleSpacing + (Math.random() * 0.05 - 0.025) * particleSpacing;
-                        const posZ = offsetZ + z * particleSpacing + (Math.random() * 0.05 - 0.025) * particleSpacing;
-                        
-                        // Set position
-                        particlePositions[particleIndex * 4] = posX;
-                        particlePositions[particleIndex * 4 + 1] = posY;
-                        particlePositions[particleIndex * 4 + 2] = posZ;
-                        particlePositions[particleIndex * 4 + 3] = 0.0; // Not used
-                        
-                        // Initialize velocity with very slight randomness
-                        // Minimal initial velocity to avoid the "exploding" effect
-                        particleVelocities[particleIndex * 4] = (Math.random() - 0.5) * 0.01;
-                        particleVelocities[particleIndex * 4 + 1] = (Math.random() - 0.5) * 0.01;
-                        particleVelocities[particleIndex * 4 + 2] = (Math.random() - 0.5) * 0.01;
-                        particleVelocities[particleIndex * 4 + 3] = 0.0; // Not used
-                        
-                        particleIndex++;
-                    }
-                }
-            }
-            
-            // Fill any remaining particles (in case the grid didn't accommodate all)
-            while (particleIndex < params.particleCount) {
-                particlePositions[particleIndex * 4] = offsetX + Math.random() * blockWidth;
-                particlePositions[particleIndex * 4 + 1] = offsetY + Math.random() * blockHeight;
-                particlePositions[particleIndex * 4 + 2] = offsetZ + Math.random() * blockDepth;
-                particlePositions[particleIndex * 4 + 3] = 0.0;
-                
-                particleVelocities[particleIndex * 4] = (Math.random() - 0.5) * 0.01;
-                particleVelocities[particleIndex * 4 + 1] = (Math.random() - 0.5) * 0.01;
-                particleVelocities[particleIndex * 4 + 2] = (Math.random() - 0.5) * 0.01;
-                particleVelocities[particleIndex * 4 + 3] = 0.0;
-                
-                particleIndex++;
-            }
         }
         
         // Set up disintegration feature
@@ -1819,7 +1538,7 @@
         
         // Reset the simulation
         function resetSimulation() {
-            // Properly re-initialize particles with updated parameters
+            // Re-initialize particles
             initializeBlockMode();
             
             // Update the displayed positions in three.js
@@ -2137,35 +1856,6 @@
             }
         }
         
-        // TEMPORARY FIX!!!!!! to completely reset particle velocities when they're moving very slowly
-        function updateVelocityDampingForCalm() {
-            for (let i = 0; i < params.particleCount; i++) {
-                // Get current velocity magnitude
-                const vx = particleVelocities[i * 4];
-                const vy = particleVelocities[i * 4 + 1];
-                const vz = particleVelocities[i * 4 + 2];
-                
-                const velMagSquared = vx*vx + vy*vy + vz*vz;
-                
-                // Much more aggressive velocity damping for stability
-                const stoppingThreshold = 0.05; // Higher threshold to stop particles
-                if (velMagSquared < stoppingThreshold * stoppingThreshold) {
-                    // Almost completely stop very slow particles
-                    particleVelocities[i * 4] *= 0.7;
-                    particleVelocities[i * 4 + 1] *= 0.7;
-                    particleVelocities[i * 4 + 2] *= 0.7;
-                    
-                    // If extremely slow, stop completely
-                    const nearZeroThreshold = 0.01;
-                    if (velMagSquared < nearZeroThreshold * nearZeroThreshold) {
-                        particleVelocities[i * 4] = 0;
-                        particleVelocities[i * 4 + 1] = 0;
-                        particleVelocities[i * 4 + 2] = 0;
-                    }
-                }
-            }
-        }
-
         // Update object physics
         function updateObjectPhysics(deltaTime) {
             if (!loadedModel) return;
@@ -2597,11 +2287,6 @@
             
             // Update the visualization
             updateParticleVisualization();
-
-            // TEMPORARY FIX!!!!!! Update to slow particles to a halt when moving very slowly
-            updateVelocityDampingForCalm();
-            applyExtraDamping();
-            stabilizeFluid();
             
             // Helper function to compute divergence
             function computeDivergence(velocityGrid, divergenceGrid, markerGrid) {
@@ -2855,7 +2540,7 @@
                         const distSquared = dx*dx + dy*dy + dz*dz;
                         
                         // Only consider particles within interaction radius
-                        const interactionRadius = params.interactionRadius;
+                        const interactionRadius = particleRadius * 2.5;
                         if (distSquared < interactionRadius * interactionRadius && distSquared > 0.0001) {
                             const dist = Math.sqrt(distSquared);
                             
@@ -2864,108 +2549,72 @@
                             const dirY = dy / dist;
                             const dirZ = dz / dist;
                             
-                            // === IMPROVED PRESSURE FORCE ===
-                            // Using poly6 kernel for smoother pressure gradient
+                            // PRESSURE FORCE: Prevents particles from overlapping
+                            // Using a smoothed kernel for better stability and less "springy" behavior
                             const q = dist / interactionRadius;
-                            const pressureKernel = Math.pow(1 - q, 4) * (4 * q + 1);
-                            const pressureStrength = 15.0; // Increased pressure strength
+                            const pressureKernel = Math.max(0, 1 - q) * Math.max(0, 1 - q);
+                            const pressureStrength = 10.0; // Higher values make particles repel more strongly
                             const pressureForce = pressureStrength * pressureKernel;
                             
-                            // === ENHANCED VISCOSITY FORCE ===
+                            // VISCOSITY FORCE: Smooths out velocity differences
                             // Use relative velocity for viscosity
                             const relVelX = particleVelocities[neighborIdx * 4] - particleVelocities[i * 4];
                             const relVelY = particleVelocities[neighborIdx * 4 + 1] - particleVelocities[i * 4 + 1];
                             const relVelZ = particleVelocities[neighborIdx * 4 + 2] - particleVelocities[i * 4 + 2];
                             
-                            // Apply viscosity to all velocity components, not just along the connecting line
-                            // This helps particles settle faster by damping all motion
-                            const viscosityStrength = 1.5; // Increased viscosity
-                            const viscosityKernel = Math.pow(1 - q, 2);
-                            const viscosityForceX = viscosityStrength * viscosityKernel * relVelX;
-                            const viscosityForceY = viscosityStrength * viscosityKernel * relVelY;
-                            const viscosityForceZ = viscosityStrength * viscosityKernel * relVelZ;
+                            // Dot product to get velocity component along connecting line
+                            const velAlongLine = relVelX * dirX + relVelY * dirY + relVelZ * dirZ;
                             
-                            // === IMPROVED COHESION FORCE ===
-                            // Creates surface tension, modified for better water-like behavior
-                            const cohesionKernel = q > 0.2 && q < 0.8 ? 
-                                Math.pow(1 - q, 3) : 0;
-                            const cohesionStrength = 0.8;
-                            const cohesionForce = -cohesionStrength * cohesionKernel;
+                            // Apply viscosity only when particles are approaching each other
+                            const viscosityForce = velAlongLine < 0 ? -velAlongLine * 0.5 : 0;
+                            
+                            // COHESION FORCE: Attracts particles to create surface tension
+                            // Only active at medium distances - particles too close repel, particles too far have no effect
+                            const cohesionKernel = q > 0.2 && q < 0.8 ? 0.5 * Math.sin((q - 0.2) / 0.6 * Math.PI) : 0;
+                            const cohesionStrength = 0.8; // Strength of surface tension
+                            const cohesionForce = -cohesionStrength * cohesionKernel; // Negative since it's attractive
                             
                             // Combine all forces
-                            // Pressure forces along the direction vector
-                            particleForces[i * 3] += dirX * pressureForce;
-                            particleForces[i * 3 + 1] += dirY * pressureForce;
-                            particleForces[i * 3 + 2] += dirZ * pressureForce;
+                            const totalForceX = dirX * (pressureForce + viscosityForce + cohesionForce);
+                            const totalForceY = dirY * (pressureForce + viscosityForce + cohesionForce);
+                            const totalForceZ = dirZ * (pressureForce + viscosityForce + cohesionForce);
                             
-                            // Viscosity forces directly affect velocity components
-                            particleForces[i * 3] -= viscosityForceX;
-                            particleForces[i * 3 + 1] -= viscosityForceY;
-                            particleForces[i * 3 + 2] -= viscosityForceZ;
-                            
-                            // Cohesion forces along the direction vector
-                            particleForces[i * 3] += dirX * cohesionForce;
-                            particleForces[i * 3 + 1] += dirY * cohesionForce;
-                            particleForces[i * 3 + 2] += dirZ * cohesionForce;
+                            // Add to particle forces
+                            particleForces[i * 3] += totalForceX;
+                            particleForces[i * 3 + 1] += totalForceY;
+                            particleForces[i * 3 + 2] += totalForceZ;
                         }
                     }
                 }
                 
-                // Apply forces to velocities with velocity damping for settling
+                // Apply forces to velocities
                 for (let i = 0; i < params.particleCount; i++) {
-                    // Get current velocity magnitude
-                    const vx = particleVelocities[i * 4];
-                    const vy = particleVelocities[i * 4 + 1];
-                    const vz = particleVelocities[i * 4 + 2];
-                    const velMagSquared = vx*vx + vy*vy + vz*vz;
-                    
-                    // Apply global damping (higher than before)
-                    const globalDamping = 0.95; // 2% velocity reduction per step
-                    
-                    // Apply additional damping when velocity is low to help settling
-                    const settlingThreshold = 0.5;
-                    let totalDamping = globalDamping;
-                    
-                    if (velMagSquared < settlingThreshold * settlingThreshold) {
-                        // Stronger damping for low velocities
-                        const settlingDamping = 0.8; // 10% additional reduction for slow particles
-                        totalDamping *= settlingDamping;
-                    }
-                    
-                    // Apply forces with semi-implicit Euler integration
-                    particleVelocities[i * 4] = (vx + particleForces[i * 3] * deltaTime) * totalDamping;
-                    particleVelocities[i * 4 + 1] = (vy + particleForces[i * 3 + 1] * deltaTime) * totalDamping;
-                    particleVelocities[i * 4 + 2] = (vz + particleForces[i * 3 + 2] * deltaTime) * totalDamping;
+                    // Using semi-implicit Euler integration for stability
+                    particleVelocities[i * 4] += particleForces[i * 3] * deltaTime;
+                    particleVelocities[i * 4 + 1] += particleForces[i * 3 + 1] * deltaTime;
+                    particleVelocities[i * 4 + 2] += particleForces[i * 3 + 2] * deltaTime;
                     
                     // Apply velocity clamping for stability
-                    const maxVelocity = 10.0; // Reduced maximum velocity
-                    const velMagSquaredNew = 
+                    const maxVelocity = 20.0; // Maximum allowed velocity magnitude
+                    const velMagSquared = 
                         particleVelocities[i * 4] * particleVelocities[i * 4] +
                         particleVelocities[i * 4 + 1] * particleVelocities[i * 4 + 1] +
                         particleVelocities[i * 4 + 2] * particleVelocities[i * 4 + 2];
                     
-                    if (velMagSquaredNew > maxVelocity * maxVelocity) {
-                        const velMag = Math.sqrt(velMagSquaredNew);
+                    if (velMagSquared > maxVelocity * maxVelocity) {
+                        const velMag = Math.sqrt(velMagSquared);
                         const scale = maxVelocity / velMag;
                         particleVelocities[i * 4] *= scale;
                         particleVelocities[i * 4 + 1] *= scale;
                         particleVelocities[i * 4 + 2] *= scale;
-                    }
-                    
-                    // Improved settling: stop very slow particles completely
-                    const stoppingThreshold = 0.01;
-                    if (velMagSquaredNew < stoppingThreshold * stoppingThreshold) {
-                        particleVelocities[i * 4] *= 0.8; // Let them slowly come to a complete stop
-                        particleVelocities[i * 4 + 1] *= 0.8;
-                        particleVelocities[i * 4 + 2] *= 0.8;
                     }
                 }
             }
             
             // Advect particles and handle collisions
             function advectParticles(deltaTime) {
-                // Sub-stepping for more stable collisions and smoother motion
-                const numSubsteps = 4; // Increased from 2 to 4 substeps
+                // Sub-stepping for more stable collisions
+                const numSubsteps = 2;
                 const subDeltaTime = deltaTime / numSubsteps;
                 
                 for (let step = 0; step < numSubsteps; step++) {
@@ -2979,7 +2628,7 @@
                         const vy = particleVelocities[i * 4 + 1];
                         const vz = particleVelocities[i * 4 + 2];
                         
-                        // Update position using semi-implicit Euler with added damping
+                        // Update position using semi-implicit Euler
                         particlePositions[i * 4] += vx * subDeltaTime;
                         particlePositions[i * 4 + 1] += vy * subDeltaTime;
                         particlePositions[i * 4 + 2] += vz * subDeltaTime;
@@ -2993,45 +2642,7 @@
                         // Enforce boundary conditions
                         enforceParticleBoundaries(i);
                     }
-                    
-                    // Re-build spatial hash after each substep for accurate collision detection
-                    if (step < numSubsteps - 1) {
-                        // Only rebuild hash if we have more substeps to go
-                        rebuildSpatialHash();
-                    }
                 }
-            }
-
-            // Rebuild spatial hash for particle-particle interaction
-            function rebuildSpatialHash() {
-                // Clear the spatial hash
-                const spatialHash = {};
-                
-                // Function to get spatial hash index for particle-particle interaction
-                const particleRadius = params.particleRadius;
-                const spatialHashCellSize = particleRadius * 2.5;
-                
-                function getHashKey(x, y, z) {
-                    const cellX = Math.floor(x / spatialHashCellSize);
-                    const cellY = Math.floor(y / spatialHashCellSize);
-                    const cellZ = Math.floor(z / spatialHashCellSize);
-                    return `${cellX},${cellY},${cellZ}`;
-                }
-                
-                // Rebuild spatial hash for particle-particle interaction
-                for (let i = 0; i < params.particleCount; i++) {
-                    const x = particlePositions[i * 4];
-                    const y = particlePositions[i * 4 + 1];
-                    const z = particlePositions[i * 4 + 2];
-                    
-                    const key = getHashKey(x, y, z);
-                    if (!spatialHash[key]) {
-                        spatialHash[key] = [];
-                    }
-                    spatialHash[key].push(i);
-                }
-                
-                return spatialHash;
             }
             
             // Resolve collisions between particles
@@ -3044,10 +2655,6 @@
                 const cellX = Math.floor(px / spatialHashCellSize);
                 const cellY = Math.floor(py / spatialHashCellSize);
                 const cellZ = Math.floor(pz / spatialHashCellSize);
-                
-                // Collision parameters
-                const minDist = params.particleRadius * 2.0; // Full diameter to prevent overlap
-                const minDistSquared = minDist * minDist;
                 
                 // Check only immediate neighbors for collision
                 for (let nx = -1; nx <= 1; nx++) {
@@ -3075,7 +2682,8 @@
                                 const distSquared = dx*dx + dy*dy + dz*dz;
                                 
                                 // Check if particles are overlapping
-                                if (distSquared < minDistSquared && distSquared > 0.0001) {
+                                const minDist = particleRadius * 1.8; // Slightly less than 2*radius for better packing
+                                if (distSquared < minDist * minDist && distSquared > 0.0001) {
                                     const dist = Math.sqrt(distSquared);
                                     const penetration = minDist - dist;
                                     
@@ -3087,12 +2695,12 @@
                                     // Position correction (stronger for more overlap)
                                     const positionCorrection = penetration * 0.5; // Half the correction per particle
                                     
-                                    // Move particles apart with stronger separation
-                                    particlePositions[particleIndex * 4] -= dirX * positionCorrection * 1.05;
-                                    particlePositions[particleIndex * 4 + 1] -= dirY * positionCorrection * 1.05;
-                                    particlePositions[particleIndex * 4 + 2] -= dirZ * positionCorrection * 1.05;
+                                    // Move particles apart
+                                    particlePositions[particleIndex * 4] -= dirX * positionCorrection;
+                                    particlePositions[particleIndex * 4 + 1] -= dirY * positionCorrection;
+                                    particlePositions[particleIndex * 4 + 2] -= dirZ * positionCorrection;
                                     
-                                    // Apply velocity correction with improved damping
+                                    // Apply velocity correction (approximating an elastic collision)
                                     const v1x = particleVelocities[particleIndex * 4];
                                     const v1y = particleVelocities[particleIndex * 4 + 1];
                                     const v1z = particleVelocities[particleIndex * 4 + 2];
@@ -3111,26 +2719,14 @@
                                     
                                     // Only process collision if particles are approaching
                                     if (velAlongNormal < 0) {
-                                        // Use a much lower coefficient of restitution for water-like behavior
-                                        const e = params.restitution; // Low bounce
-                                        const j = -(1.0 + e) * velAlongNormal * 0.5;
+                                        // Impulse magnitude
+                                        const e = 0.3; // Coefficient of restitution (0 = inelastic, 1 = elastic)
+                                        const j = -(1.0 + e) * velAlongNormal * 0.5; // Assuming equal mass for particles
                                         
-                                        // Apply impulse with increased damping on lateral motion
+                                        // Apply impulse
                                         particleVelocities[particleIndex * 4] -= dirX * j;
                                         particleVelocities[particleIndex * 4 + 1] -= dirY * j;
                                         particleVelocities[particleIndex * 4 + 2] -= dirZ * j;
-                                        
-                                        // Add friction-like effect to reduce lateral motion
-                                        // First, calculate the tangential component of relative velocity
-                                        const tangentialX = rvx - velAlongNormal * dirX;
-                                        const tangentialY = rvy - velAlongNormal * dirY;
-                                        const tangentialZ = rvz - velAlongNormal * dirZ;
-                                        
-                                        // Apply friction (reduces lateral sliding between particles)
-                                        const friction = 0.3; // Friction coefficient
-                                        particleVelocities[particleIndex * 4] -= tangentialX * friction;
-                                        particleVelocities[particleIndex * 4 + 1] -= tangentialY * friction;
-                                        particleVelocities[particleIndex * 4 + 2] -= tangentialZ * friction;
                                     }
                                 }
                             }
@@ -3150,7 +2746,6 @@
                 particleSystem.geometry.attributes.position.needsUpdate = true;
             }
         }
-        
 
         // Helper function to enforce grid boundary conditions for MAC (staggered) grid
         function enforceBoundariesMACGrid(velocityGrid, markerGrid) {
@@ -3194,75 +2789,6 @@
             }
         }
 
-        //  Helper function to properly change particle count with deletion.
-        function updateParticleCount(oldCount, newCount) {
-            // Calculate particles dimensions based on count
-            const aspectRatio = 1;
-            params.particlesWidth = Math.ceil(Math.sqrt(newCount * aspectRatio));
-            params.particlesHeight = Math.ceil(newCount / params.particlesWidth);
-            
-            if (newCount < oldCount) {
-                // If reducing particles, hide excess particles by moving them far away
-                for (let i = newCount; i < oldCount; i++) {
-                    // Move particles far outside the visible area
-                    particlePositions[i * 4] = 9999;
-                    particlePositions[i * 4 + 1] = 9999;
-                    particlePositions[i * 4 + 2] = 9999;
-                    
-                    // Zero out their velocities
-                    particleVelocities[i * 4] = 0;
-                    particleVelocities[i * 4 + 1] = 0;
-                    particleVelocities[i * 4 + 2] = 0;
-                    
-                    // Update the visualization
-                    particleSystem.geometry.attributes.position.array[i * 3] = 9999;
-                    particleSystem.geometry.attributes.position.array[i * 3 + 1] = 9999;
-                    particleSystem.geometry.attributes.position.array[i * 3 + 2] = 9999;
-                }
-            } else if (newCount > oldCount) {
-                // If increasing particles, initialize new particles in a sensible way
-                initializeNewParticles(oldCount, newCount);
-            }
-            
-            // Update the THREE.js buffer
-            particleSystem.geometry.attributes.position.needsUpdate = true;
-        }
-
-        // Helper to initialize new particles when increasing count
-        function initializeNewParticles(startIndex, endIndex) {
-            // Place new particles in a grid at the top of the container
-            const halfWidth = params.gridWidth / 2;
-            const halfHeight = params.gridHeight / 2;
-            const halfDepth = params.gridDepth / 2;
-            
-            const particleSpacing = params.particleRadius * 2.2;
-            const particlesPerRow = Math.ceil(Math.sqrt(endIndex - startIndex));
-            
-            let idx = 0;
-            for (let i = startIndex; i < endIndex; i++) {
-                // Calculate grid position for new particles at the top of the container
-                const row = Math.floor(idx / particlesPerRow);
-                const col = idx % particlesPerRow;
-                
-                // Place particles in a flat layer at the top
-                particlePositions[i * 4] = -halfWidth + 2 + (col * particleSpacing);
-                particlePositions[i * 4 + 1] = halfHeight - 2; // Near the top
-                particlePositions[i * 4 + 2] = -halfDepth + 2 + (row * particleSpacing);
-                
-                // Small initial velocity downward
-                particleVelocities[i * 4] = (Math.random() - 0.5) * 0.1;
-                particleVelocities[i * 4 + 1] = -0.5 - Math.random() * 0.5;
-                particleVelocities[i * 4 + 2] = (Math.random() - 0.5) * 0.1;
-                
-                // Update the visualization
-                particleSystem.geometry.attributes.position.array[i * 3] = particlePositions[i * 4];
-                particleSystem.geometry.attributes.position.array[i * 3 + 1] = particlePositions[i * 4 + 1];
-                particleSystem.geometry.attributes.position.array[i * 3 + 2] = particlePositions[i * 4 + 2];
-                
-                idx++;
-            }
-        }
-
         // Helper function to enforce particle boundary conditions
         function enforceParticleBoundaries(particleIndex) {
             const halfWidth = params.gridWidth / 2;
@@ -3277,75 +2803,37 @@
             const vy = particleVelocities[particleIndex * 4 + 1];
             const vz = particleVelocities[particleIndex * 4 + 2];
             
-            // Use lower damping and add minimum distance from wall to prevent sticking
-            const damping = 0.2; // Lower value = less energy loss on collision
-            const particleRadius = params.particleRadius;
-            const wallOffset = particleRadius * 1.02; // Slight offset to prevent wall sticking
+            const damping = 0.3; // Collision damping factor - higher values = less bounce
+            const particleRadius = params.sphereRadius * 0.8; // Slightly smaller than visual radius
             
-            let modified = false;
-            
-            // Check X boundaries with anti-sticking measures
+            // Check X boundaries
             if (px - particleRadius < -halfWidth) {
-                particlePositions[particleIndex * 4] = -halfWidth + wallOffset;
-                // Only reflect velocity if moving toward the wall
-                if (vx < 0) {
-                    particleVelocities[particleIndex * 4] = Math.abs(vx) * (1 - damping);
-                    // Add small outward push
-                    particleVelocities[particleIndex * 4] += 0.1;
-                }
-                modified = true;
+                particlePositions[particleIndex * 4] = -halfWidth + particleRadius;
+                particleVelocities[particleIndex * 4] = Math.abs(vx) * (1 - damping);
             } else if (px + particleRadius > halfWidth) {
-                particlePositions[particleIndex * 4] = halfWidth - wallOffset;
-                if (vx > 0) {
-                    particleVelocities[particleIndex * 4] = -Math.abs(vx) * (1 - damping);
-                    particleVelocities[particleIndex * 4] -= 0.1;
-                }
-                modified = true;
+                particlePositions[particleIndex * 4] = halfWidth - particleRadius;
+                particleVelocities[particleIndex * 4] = -Math.abs(vx) * (1 - damping);
             }
             
             // Check Y boundaries
             if (py - particleRadius < -halfHeight) {
-                particlePositions[particleIndex * 4 + 1] = -halfHeight + wallOffset;
-                if (vy < 0) {
-                    particleVelocities[particleIndex * 4 + 1] = Math.abs(vy) * (1 - damping);
-                    particleVelocities[particleIndex * 4 + 1] += 0.1;
-                }
-                modified = true;
+                particlePositions[particleIndex * 4 + 1] = -halfHeight + particleRadius;
+                particleVelocities[particleIndex * 4 + 1] = Math.abs(vy) * (1 - damping);
             } else if (py + particleRadius > halfHeight) {
-                particlePositions[particleIndex * 4 + 1] = halfHeight - wallOffset;
-                if (vy > 0) {
-                    particleVelocities[particleIndex * 4 + 1] = -Math.abs(vy) * (1 - damping);
-                    particleVelocities[particleIndex * 4 + 1] -= 0.1;
-                }
-                modified = true;
+                particlePositions[particleIndex * 4 + 1] = halfHeight - particleRadius;
+                particleVelocities[particleIndex * 4 + 1] = -Math.abs(vy) * (1 - damping);
             }
             
             // Check Z boundaries
             if (pz - particleRadius < -halfDepth) {
-                particlePositions[particleIndex * 4 + 2] = -halfDepth + wallOffset;
-                if (vz < 0) {
-                    particleVelocities[particleIndex * 4 + 2] = Math.abs(vz) * (1 - damping);
-                    particleVelocities[particleIndex * 4 + 2] += 0.1;
-                }
-                modified = true;
+                particlePositions[particleIndex * 4 + 2] = -halfDepth + particleRadius;
+                particleVelocities[particleIndex * 4 + 2] = Math.abs(vz) * (1 - damping);
             } else if (pz + particleRadius > halfDepth) {
-                particlePositions[particleIndex * 4 + 2] = halfDepth - wallOffset;
-                if (vz > 0) {
-                    particleVelocities[particleIndex * 4 + 2] = -Math.abs(vz) * (1 - damping);
-                    particleVelocities[particleIndex * 4 + 2] -= 0.1;
-                }
-                modified = true;
+                particlePositions[particleIndex * 4 + 2] = halfDepth - particleRadius;
+                particleVelocities[particleIndex * 4 + 2] = -Math.abs(vz) * (1 - damping);
             }
-    
-    // If the particle was modified (near a wall), apply additional damping
-    // This helps particles settle faster when near walls
-    if (modified) {
-        const extraDamping = 0.95; // 5% velocity reduction near walls
-        particleVelocities[particleIndex * 4] *= extraDamping;
-        particleVelocities[particleIndex * 4 + 1] *= extraDamping;
-        particleVelocities[particleIndex * 4 + 2] *= extraDamping;
-    }
-}
+        }
+
         // Improved particle-model collision detection
         function checkParticleModelCollision(particleIndex) {
             if (!loadedModel || modelMeshes.length === 0) return;
@@ -3484,7 +2972,138 @@
             }
         }
         
+        // Helper function to enforce particle boundary conditions
+        function enforceParticleBoundaries(particleIndex) {
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            const px = particlePositions[particleIndex * 4];
+            const py = particlePositions[particleIndex * 4 + 1];
+            const pz = particlePositions[particleIndex * 4 + 2];
+            
+            const vx = particleVelocities[particleIndex * 4];
+            const vy = particleVelocities[particleIndex * 4 + 1];
+            const vz = particleVelocities[particleIndex * 4 + 2];
+            
+            const damping = 0.3; // Collision damping factor
+            
+            // Check X boundaries
+            if (px < -halfWidth) {
+                particlePositions[particleIndex * 4] = -halfWidth;
+                particleVelocities[particleIndex * 4] = -vx * damping;
+            } else if (px > halfWidth) {
+                particlePositions[particleIndex * 4] = halfWidth;
+                particleVelocities[particleIndex * 4] = -vx * damping;
+            }
+            
+            // Check Y boundaries
+            if (py < -halfHeight) {
+                particlePositions[particleIndex * 4 + 1] = -halfHeight;
+                particleVelocities[particleIndex * 4 + 1] = -vy * damping;
+            } else if (py > halfHeight) {
+                particlePositions[particleIndex * 4 + 1] = halfHeight;
+                particleVelocities[particleIndex * 4 + 1] = -vy * damping;
+            }
+            
+            // Check Z boundaries
+            if (pz < -halfDepth) {
+                particlePositions[particleIndex * 4 + 2] = -halfDepth;
+                particleVelocities[particleIndex * 4 + 2] = -vz * damping;
+            } else if (pz > halfDepth) {
+                particlePositions[particleIndex * 4 + 2] = halfDepth;
+                particleVelocities[particleIndex * 4 + 2] = -vz * damping;
+            }
+        }
         
+        // Check for collision between particle and loaded model
+        function checkParticleModelCollision(particleIndex) {
+            if (!loadedModel || modelMeshes.length === 0) return;
+            
+            const px = particlePositions[particleIndex * 4];
+            const py = particlePositions[particleIndex * 4 + 1];
+            const pz = particlePositions[particleIndex * 4 + 2];
+            
+            // Quick check against model bounding box
+            const modelPosition = loadedModel.position;
+            const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            
+            // Add padding for particle radius
+            const particleRadius = params.sphereRadius * 0.5;
+            boundingBox.expandByScalar(particleRadius);
+            
+            const particlePoint = new THREE.Vector3(px, py, pz);
+            
+            // If particle is within expanded bounding box
+            if (boundingBox.containsPoint(particlePoint)) {
+                // Check against model
+                for (let i = 0; i < modelMeshes.length; i++) {
+                    const meshBox = modelMeshes[i].boundingBox.clone();
+                    meshBox.expandByScalar(particleRadius);
+                    
+                    if (meshBox.containsPoint(particlePoint)) {
+                        // Calculate approximate normal (from particle to mesh center)
+                        const meshCenter = new THREE.Vector3();
+                        meshBox.getCenter(meshCenter);
+                        
+                        const normal = new THREE.Vector3(
+                            particlePoint.x - meshCenter.x,
+                            particlePoint.y - meshCenter.y,
+                            particlePoint.z - meshCenter.z
+                        ).normalize();
+                        
+                        // Apply impulse to model
+                        const velocityMagnitude = Math.sqrt(
+                            particleVelocities[particleIndex * 4] * particleVelocities[particleIndex * 4] +
+                            particleVelocities[particleIndex * 4 + 1] * particleVelocities[particleIndex * 4 + 1] +
+                            particleVelocities[particleIndex * 4 + 2] * particleVelocities[particleIndex * 4 + 2]
+                        );
+                        
+                        // Apply impulse to model (scaled by particle velocity)
+                        if (velocityMagnitude > 0.1) {
+                            const impulseFactor = 0.001;
+                            loadedModel.userData.velocity.x += normal.x * velocityMagnitude * impulseFactor;
+                            loadedModel.userData.velocity.y += normal.y * velocityMagnitude * impulseFactor;
+                            loadedModel.userData.velocity.z += normal.z * velocityMagnitude * impulseFactor;
+                            
+                            // Add some angular velocity
+                            const torqueDir = new THREE.Vector3().crossVectors(
+                                particlePoint.clone().sub(modelPosition),
+                                normal
+                            ).normalize().multiplyScalar(0.0002 * velocityMagnitude);
+                            
+                            loadedModel.userData.angularVelocity.add(torqueDir);
+                        }
+                        
+                        // Reflect particle velocity
+                        const vx = particleVelocities[particleIndex * 4];
+                        const vy = particleVelocities[particleIndex * 4 + 1];
+                        const vz = particleVelocities[particleIndex * 4 + 2];
+                        
+                        const dot = vx * normal.x + vy * normal.y + vz * normal.z;
+                        
+                        // Only reflect if moving toward surface
+                        if (dot < 0) {
+                            const damping = 0.5;
+                            
+                            // Reflect velocity
+                            particleVelocities[particleIndex * 4] = (vx - 2 * dot * normal.x) * damping;
+                            particleVelocities[particleIndex * 4 + 1] = (vy - 2 * dot * normal.y) * damping;
+                            particleVelocities[particleIndex * 4 + 2] = (vz - 2 * dot * normal.z) * damping;
+                            
+                            // Move particle outside the collision
+                            particlePositions[particleIndex * 4] = px + normal.x * particleRadius * 1.01;
+                            particlePositions[particleIndex * 4 + 1] = py + normal.y * particleRadius * 1.01;
+                            particlePositions[particleIndex * 4 + 2] = pz + normal.z * particleRadius * 1.01;
+                        }
+                        
+                        return; // Only handle one collision per particle per frame
+                    }
+                }
+            }
+        }
         
         // Main animation loop
         function animate(now) {

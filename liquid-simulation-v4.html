@@ -1,0 +1,3521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluid Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #000;
+            --text-light: #fff;
+            --accent-blue: #0070f3;
+            --accent-gradient-start: #0070f3;
+            --accent-gradient-end: #ff4d4d;
+            --card-bg: rgba(23, 23, 23, 0.8);
+            --slider-track: #333;
+            --slider-thumb: #fff;
+            --button-primary: #0070f3;
+            --button-hover: #0060d3;
+            --button-active: #0050c3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .nav a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .nav a:hover {
+            opacity: 1;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--text-light);
+            color: var(--bg-dark);
+            border: none;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--text-light);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .main {
+            position: relative;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sim-controls {
+            position: absolute;
+            bottom: 2rem;
+            right: 2rem;
+            width: 300px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s;
+        }
+
+        .sim-controls.hidden {
+            transform: translateX(calc(100% + 2rem));
+        }
+
+        .toggle-panel {
+            position: absolute;
+            left: -50px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: var(--card-bg);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-divider {
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.1);
+            margin: 1.5rem 0;
+        }
+
+        .control-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .control-value {
+            opacity: 0.7;
+            font-size: 0.8rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            background: var(--slider-track);
+            border-radius: 2px;
+            outline: none;
+            transition: background 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--slider-thumb);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .control-group button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .control-group button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+        }
+
+        .control-group button:active {
+            filter: brightness(0.9);
+            transform: translateY(0);
+        }
+
+        .grid-background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 6rem;
+            left: 2rem;
+            max-width: 500px;
+            z-index: 10;
+        }
+
+        .info-panel h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .info-panel p {
+            opacity: 0.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .preset-btn {
+            padding: 0.4rem 0.8rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .preset-btn.active {
+            background-color: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+        
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .loading-text {
+            margin-top: 2rem;
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-blue);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .performance-stats {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 4px;
+            z-index: 100;
+        }
+        
+        .attribution {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 0.7rem;
+            opacity: 0.6;
+        }
+
+        /* Object upload styling */
+        .model-upload {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+        }
+
+        .file-input-container {
+            position: relative;
+            flex: 1;
+        }
+
+        .file-input-container input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-input-container .file-input-label {
+            display: block;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-input-container input[type="file"]:hover + .file-input-label {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .load-model-btn {
+            padding: 0.5rem 0.75rem;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .load-model-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .load-model-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Control button grid */
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .button-grid button {
+            margin-top: 0;
+        }
+
+        /* Button icons */
+        .button-icon {
+            margin-right: 0.5rem;
+            font-size: 1rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .info-panel {
+                top: 5rem;
+                left: 1rem;
+                right: 1rem;
+                max-width: none;
+            }
+            
+            .info-panel h1 {
+                font-size: 1.8rem;
+            }
+            
+            .sim-controls {
+                bottom: 1rem;
+                right: 1rem;
+                width: calc(100% - 2rem);
+            }
+        }
+        
+        .disintegrate-button {
+            position: relative;
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 1rem;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #ff4d4d, #ff0000);
+            opacity: 0.7;
+            transition: width 0.1s linear;
+        }
+        
+        .disintegrate-button span {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">Initializing fluid simulation...</div>
+    </div>
+
+    <header class="header">
+        <div class="logo">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 19.5H22L12 2Z" fill="white"/>
+            </svg>
+            FluidSim
+        </div>
+        <nav class="nav">
+            <a href="#">Features</a>
+            <a href="#">Documentation</a>
+            <a href="#">About</a>
+        </nav>
+        <div class="actions">
+            <button class="btn btn-secondary">GitHub</button>
+            <button class="btn btn-primary">Download</button>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="grid-background"></div>
+        <canvas id="canvas"></canvas>
+        <div class="performance-stats">FPS: <span id="fps-counter">0</span></div>
+
+        <div class="info-panel">
+            <h1>Fluid Simulation<br>for Interactive Applications</h1>
+            <p>Based on Smoothed Particle Hydrodynamics (SPH), this simulation models realistic fluid dynamics in real-time. Adjust parameters to explore different fluid behaviors and visualization options.</p>
+            <div class="preset-buttons">
+                <button class="preset-btn active" id="preset-water">Water</button>
+                <button class="preset-btn" id="preset-blocks">Block Test</button>
+                <button class="preset-btn" id="preset-spheres" onclick="applyPreset('spheres')">Spheres</button>
+
+            </div>
+        </div>
+
+        <div class="sim-controls">
+            <button class="toggle-panel">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15.5 19L8.5 12L15.5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Particles</span>
+                    <span class="control-value" id="particle-count-value">2500</span>
+                </div>
+                <input type="range" id="particle-count" min="500" max="10000" step="500" value="2500">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Fluidity</span>
+                    <span class="control-value" id="fluidity-value">0.99</span>
+                </div>
+                <input type="range" id="fluidity" min="0.5" max="0.99" step="0.01" value="0.99">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Simulation Speed</span>
+                    <span class="control-value" id="speed-value">1.0</span>
+                </div>
+                <input type="range" id="speed" min="0" max="2" step="0.1" value="1.0">
+            </div>
+            
+            <div class="control-divider"></div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Sphere Radius</span>
+                    <span class="control-value" id="radius-value">0.2</span>
+                </div>
+                <input type="range" id="radius" min="0.05" max="0.5" step="0.01" value="0.2">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>Render Style</span>
+                </div>
+                <select id="render-style" style="width: 100%; padding: 0.5rem; background: #222; color: white; border: 1px solid #444; border-radius: 4px;">
+                    <option value="points">Points</option>
+                    <option value="metaballs" selected>Metaballs</option>
+                    <option value="surface">Smooth Surface</option>
+                </select>
+            </div>
+
+            <div class="control-divider"></div>
+            
+            <div class="control-group">
+                <div class="control-title">
+                    <span>3D Model Import</span>
+                </div>
+                <div class="model-upload">
+                    <div class="file-input-container">
+                        <input type="file" id="obj-file" accept=".obj">
+                        <label for="obj-file" class="file-input-label" id="file-name-display">Choose File</label>
+                    </div>
+                    <button id="load-model" class="load-model-btn" disabled>Load</button>
+                </div>
+            </div>
+
+            <div class="control-divider"></div>
+
+            <div class="control-group">
+                <div class="button-grid">
+                    <button id="reset-sim">
+                        <span class="button-icon">↺</span>Reset
+                    </button>
+                    <button id="pause-button">
+                        <span class="button-icon" id="pause-icon">⏸️</span><span id="pause-text">Pause</span>
+                    </button>
+                    <button id="drop-particles" style="grid-column: span 2;">
+                        <span class="button-icon">↓</span>Drop Particles
+                    </button>
+                </div>
+            </div>
+            
+            <button id="disintegrate-button" class="disintegrate-button">
+                <div class="progress-bar"></div>
+                <span>Disintegrate Object</span>
+            </button>
+        </div>
+        
+        <div class="attribution">
+            Based on research from Matthias Müller, David Charypar and Markus Gross
+        </div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/OBJLoader.js"></script>
+    <script>
+        // Main simulation parameters
+        const params = {
+            particleCount: 2500,
+            flipness: 0.95,        // FLIP mixing parameter (0 = PIC, 1 = FLIP) - slightly reduced for stability
+            sphereRadius: 0.2,     // Visual radius of the particles
+            renderStyle: 'metaballs',
+            timeScale: 1.0,
+            particlesWidth: 0,     // Will be calculated based on particle count
+            particlesHeight: 0,    // Will be calculated based on particle count
+            
+            // Grid parameters - higher resolution for better fluid behavior
+            gridWidth: 40,
+            gridHeight: 20,
+            gridDepth: 20,
+            gridResolutionX: 64,   // Increased from original
+            gridResolutionY: 32,   // Increased from original
+            gridResolutionZ: 32,   // Increased from original
+            particleDensity: 8,    // Target number of particles per cell
+            
+            // Fluid physics parameters
+            viscosity: 0.1,        // Higher = more viscous/sticky
+            pressureStiffness: 50.0, // Higher = particles repel more strongly
+            surfaceTension: 0.8,   // Higher = stronger surface tension
+            restitution: 0.3,      // Bounce factor (0 = no bounce, 1 = perfect bounce)
+            
+            // Particle interaction parameters
+            particleRadius: 0.0,   // Will be set to 80% of sphereRadius
+            interactionRadius: 0.0, // Will be set to 2.5 * particleRadius
+            maxVelocity: 20.0     // Maximum velocity magnitude for stability
+        };
+
+        // This should be called whenever sphereRadius changes
+        function updateDerivedParameters() {
+            params.particleRadius = params.sphereRadius * 0.8;
+            params.interactionRadius = params.particleRadius * 2.5;
+        }
+
+        updateDerivedParameters();
+        
+        // Global variables
+        let scene, camera, renderer, controls;
+        let container, clock;
+        let isSimulationPaused = false;
+        let lastTime = 0;
+        let frameCount = 0;
+        let fpsUpdateInterval = 1000; // Update FPS every second
+        let fpsLastUpdate = 0;
+        let loadedModel = null;
+        let modelMeshes = [];
+        let raycaster, mouse;
+        let isDragging = false;
+        let selectedObject = null;
+        let dragOffset = new THREE.Vector3();
+        
+        // Simulation specific variables
+        let particleSystem;
+        let particleMaterial;
+        let particlePositions;
+        let particleVelocities;
+        
+        // Grid-based solver variables
+        let velocityTexture, tempVelocityTexture, weightTexture;
+        let markerTexture, pressureTexture, divergenceTexture;
+        let originalVelocityTexture;
+        
+        // WebGL specific variables for simulation
+        let simulationFramebuffer;
+        let simulationPrograms = {};
+        
+        // Initialize the scene
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(30, 10, 30);
+            camera.lookAt(0, 0, 0);
+            
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: document.getElementById('canvas'), 
+                antialias: true,
+                alpha: true,
+                preserveDrawingBuffer: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            
+            // Setup raycaster and mouse for object interaction
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            
+            // Create orbit controls
+            const OrbitControlsClass = setupOrbitControls();
+            
+            // Add camera controls
+            controls = new OrbitControlsClass(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.rotateSpeed = 0.7;
+            controls.zoomSpeed = 1.2;
+            controls.panSpeed = 0.8;
+            controls.minDistance = 20;
+            controls.maxDistance = 100;
+            controls.target.set(0, 0, 0);
+            
+            // Clock for time-based animations
+            clock = new THREE.Clock();
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            
+            // Add intense directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            // Add a bright point light in the top corner
+            const cornerLight = new THREE.PointLight(0xffffff, 5.0, 50);
+            cornerLight.position.set(params.gridWidth/2 + 3, params.gridHeight/2 + 3, params.gridDepth/2 + 3);
+            scene.add(cornerLight);
+            
+            // Add a colored point light for highlighting
+            const pointLight = new THREE.PointLight(0x2389da, 2.5, 60);
+            pointLight.position.set(0, params.gridHeight/2 + 2, 0);
+            scene.add(pointLight);
+            
+            // Container for the simulation (visible bounds)
+            container = new THREE.BoxHelper(
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(params.gridWidth, params.gridHeight, params.gridDepth),
+                    new THREE.MeshBasicMaterial()
+                )
+            );
+            container.material.color.set(0x333333);
+            // Center the container at origin
+            container.position.set(0, 0, 0);
+            scene.add(container);
+            
+            // Initialize WebGL for simulation
+            initSimulationWebGL();
+            
+            // Initialize the particle system
+            initParticleSystem();
+            
+            // Initialize event listeners
+            initEventListeners();
+            
+            // Remove loading screen after initialization
+            setTimeout(() => {
+                document.querySelector('.loading').style.opacity = 0;
+                setTimeout(() => {
+                    document.querySelector('.loading').style.display = 'none';
+                }, 1000);
+            }, 1500);
+            
+            // Create the disintegration feature
+            setupDisintegration();
+            
+            // Start animation loop
+            animate();
+        }
+
+        // Set up orbit controls
+        function setupOrbitControls() {
+            // Use a simplified OrbitControls implementation
+            class OrbitControls {
+                constructor(camera, domElement) {
+                    this.camera = camera;
+                    this.domElement = domElement;
+                    
+                    // Configuration
+                    this.enabled = true;
+                    this.target = new THREE.Vector3(0, 0, 0);
+                    this.enableDamping = true;
+                    this.dampingFactor = 0.1;
+                    this.enableZoom = true;
+                    this.zoomSpeed = 1.0;
+                    this.minDistance = 5;
+                    this.maxDistance = 100;
+                    this.rotateSpeed = 1.0;
+                    
+                    // State variables
+                    this.isMouseDown = false;
+                    this.mouseButtons = { LEFT: 0, MIDDLE: 1, RIGHT: 2 };
+                    this.state = -1; // No state initially
+                    this.STATE = { NONE: -1, ROTATE: 0, DOLLY: 1, PAN: 2 };
+                    
+                    // Position related
+                    this.spherical = new THREE.Spherical();
+                    this.sphericalDelta = new THREE.Spherical();
+                    this.scale = 1;
+                    this.panOffset = new THREE.Vector3();
+                    this.lastPosition = new THREE.Vector3();
+                    
+                    // Mouse positions
+                    this.startMousePosition = new THREE.Vector2();
+                    this.currentMousePosition = new THREE.Vector2();
+                    
+                    // Update the initial spherical coordinates
+                    this.updateSpherical();
+                    
+                    // Add event listeners
+                    this.addEventListeners();
+                }
+                
+                updateSpherical() {
+                    const offset = new THREE.Vector3();
+                    offset.copy(this.camera.position).sub(this.target);
+                    
+                    // Convert to spherical
+                    this.spherical.setFromVector3(offset);
+                }
+                
+                addEventListeners() {
+                    // Prevent context menu
+                    this.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+                    
+                    // Mouse events
+                    this.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
+                    this.domElement.addEventListener('wheel', this.onMouseWheel.bind(this));
+                    
+                    // Attach global events
+                    window.addEventListener('mousemove', this.onMouseMove.bind(this));
+                    window.addEventListener('mouseup', this.onMouseUp.bind(this));
+                }
+                
+                onMouseDown(event) {
+                    if (!this.enabled) return;
+                    
+                    event.preventDefault();
+                    
+                    this.startMousePosition.set(event.clientX, event.clientY);
+                    
+                    switch (event.button) {
+                        case this.mouseButtons.LEFT:
+                            this.state = this.STATE.ROTATE;
+                            break;
+                        case this.mouseButtons.MIDDLE:
+                            this.state = this.STATE.DOLLY;
+                            break;
+                        case this.mouseButtons.RIGHT:
+                            this.state = this.STATE.PAN;
+                            break;
+                    }
+                    
+                    if (this.state !== this.STATE.NONE) {
+                        this.isMouseDown = true;
+                    }
+                }
+                
+                onMouseMove(event) {
+                    if (!this.enabled || !this.isMouseDown) return;
+                    
+                    this.currentMousePosition.set(event.clientX, event.clientY);
+                    
+                    const movementX = this.currentMousePosition.x - this.startMousePosition.x;
+                    const movementY = this.currentMousePosition.y - this.startMousePosition.y;
+                    
+                    if (this.state === this.STATE.ROTATE) {
+                        // Rotate
+                        const rotateSpeed = 0.002 * this.rotateSpeed;
+                        this.sphericalDelta.theta -= 2 * Math.PI * movementX / this.domElement.clientWidth * this.rotateSpeed;
+                        this.sphericalDelta.phi -= 2 * Math.PI * movementY / this.domElement.clientHeight * this.rotateSpeed;
+                    } else if (this.state === this.STATE.DOLLY) {
+                        // Zoom
+                        const y = movementY;
+                        if (y > 0) {
+                            this.scale /= Math.pow(0.95, this.zoomSpeed);
+                        } else if (y < 0) {
+                            this.scale *= Math.pow(0.95, this.zoomSpeed);
+                        }
+                    } else if (this.state === this.STATE.PAN) {
+                        // Pan (not fully implemented for simplicity)
+                        const panSpeed = 0.002 * this.camera.position.length();
+                        this.panOffset.x -= movementX * panSpeed;
+                        this.panOffset.y += movementY * panSpeed;
+                    }
+                    
+                    this.startMousePosition.copy(this.currentMousePosition);
+                    this.update();
+                }
+                
+                onMouseUp() {
+                    this.isMouseDown = false;
+                    this.state = this.STATE.NONE;
+                }
+                
+                onMouseWheel(event) {
+                    if (!this.enabled || !this.enableZoom) return;
+                    
+                    event.preventDefault();
+                    
+                    if (event.deltaY < 0) {
+                        this.scale *= Math.pow(0.95, this.zoomSpeed);
+                    } else {
+                        this.scale /= Math.pow(0.95, this.zoomSpeed);
+                    }
+                    
+                    this.update();
+                }
+                
+                update() {
+                    const offset = new THREE.Vector3();
+                    
+                    // Get current camera position
+                    offset.copy(this.camera.position).sub(this.target);
+                    
+                    // Apply rotation
+                    offset.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+                        this.camera.up, new THREE.Vector3(0, 1, 0)
+                    ));
+                    
+                    // Set spherical from current position
+                    this.spherical.setFromVector3(offset);
+                    
+                    // Apply rotation deltas
+                    this.spherical.theta += this.sphericalDelta.theta;
+                    this.spherical.phi += this.sphericalDelta.phi;
+                    
+                    // Limit phi to avoid going over the top or below the bottom
+                    this.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, this.spherical.phi));
+                    
+                    // Apply zoom
+                    this.spherical.radius *= this.scale;
+                    this.spherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, this.spherical.radius));
+                    
+                    // Move target if panning
+                    this.target.add(this.panOffset);
+                    
+                    // Update offset with new spherical coordinates
+                    offset.setFromSpherical(this.spherical);
+                    
+                    // Rotate back to camera space
+                    offset.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+                        new THREE.Vector3(0, 1, 0), this.camera.up
+                    ).invert());
+                    
+                    // Update camera position
+                    this.camera.position.copy(this.target).add(offset);
+                    this.camera.lookAt(this.target);
+                    
+                    // Reset state changes
+                    this.sphericalDelta.set(0, 0, 0);
+                    this.scale = 1;
+                    this.panOffset.set(0, 0, 0);
+                    
+                    return true;
+                }
+            }
+            
+            return OrbitControls;
+        }
+        
+        // Initialize particle system
+        function initParticleSystem() {
+            // Calculate particles dimensions based on count
+            // Try to keep width and height similar
+            const aspectRatio = 1;
+            params.particlesWidth = Math.ceil(Math.sqrt(params.particleCount * aspectRatio));
+            params.particlesHeight = Math.ceil(params.particleCount / params.particlesWidth);
+            
+            // Create particle geometry
+            const geometry = new THREE.BufferGeometry();
+            
+            // Generate particle positions
+            particlePositions = new Float32Array(params.particlesWidth * params.particlesHeight * 4);
+            particleVelocities = new Float32Array(params.particlesWidth * params.particlesHeight * 4);
+            
+            // Initialize particles with better spacing to avoid initial overlap
+            const particleRadius = params.sphereRadius * 0.8;  // Slightly smaller than visual radius
+            const spacing = particleRadius * 2.2;  // Give them a bit more space initially
+            
+            // Calculate bounds to center the particles
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            // Size of the block of particles (70% of grid size)
+            const blockWidth = params.gridWidth * 0.7;
+            const blockHeight = params.gridHeight * 0.7;
+            const blockDepth = params.gridDepth * 0.7;
+            
+            // Calculate number of particles per dimension for even distribution
+            const particlesPerDimension = Math.cbrt(params.particleCount);
+            const spacingX = blockWidth / particlesPerDimension;
+            const spacingY = blockHeight / particlesPerDimension;
+            const spacingZ = blockDepth / particlesPerDimension;
+            
+            let particleIndex = 0;
+            for (let x = 0; x < particlesPerDimension && particleIndex < params.particleCount; x++) {
+                for (let y = 0; y < particlesPerDimension && particleIndex < params.particleCount; y++) {
+                    for (let z = 0; z < particlesPerDimension && particleIndex < params.particleCount; z++) {
+                        // Calculate position with slight jitter for more natural look
+                        const posX = -halfWidth + (x * spacingX) + (blockWidth - particlesPerDimension * spacingX) / 2 + 
+                                    (Math.random() * 0.1 - 0.05) * spacingX;
+                        const posY = -halfHeight + (y * spacingY) + (blockHeight - particlesPerDimension * spacingY) / 2 + 
+                                    (Math.random() * 0.1 - 0.05) * spacingY;
+                        const posZ = -halfDepth + (z * spacingZ) + (blockDepth - particlesPerDimension * spacingZ) / 2 + 
+                                    (Math.random() * 0.1 - 0.05) * spacingZ;
+                        
+                        // Set position
+                        particlePositions[particleIndex * 4] = posX;
+                        particlePositions[particleIndex * 4 + 1] = posY;
+                        particlePositions[particleIndex * 4 + 2] = posZ;
+                        particlePositions[particleIndex * 4 + 3] = 0.0; // Not used
+                        
+                        // Initialize velocity with slight randomness for more natural movement
+                        particleVelocities[particleIndex * 4] = (Math.random() - 0.5) * 0.1;
+                        particleVelocities[particleIndex * 4 + 1] = (Math.random() - 0.5) * 0.1;
+                        particleVelocities[particleIndex * 4 + 2] = (Math.random() - 0.5) * 0.1;
+                        particleVelocities[particleIndex * 4 + 3] = 0.0; // Not used
+                        
+                        particleIndex++;
+                    }
+                }
+            }
+            
+            // Create position attribute for Three.js
+            const positions = new Float32Array(params.particleCount * 3);
+            for (let i = 0; i < params.particleCount; i++) {
+                positions[i * 3] = particlePositions[i * 4];
+                positions[i * 3 + 1] = particlePositions[i * 4 + 1];
+                positions[i * 3 + 2] = particlePositions[i * 4 + 2];
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            // Create material with adjustments for better visual appearance
+            particleMaterial = new THREE.PointsMaterial({
+                color: 0x2389da,
+                size: params.sphereRadius * 2,
+                transparent: true,
+                opacity: 0.7,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                sizeAttenuation: true
+            });
+            
+            // Create particle system
+            particleSystem = new THREE.Points(geometry, particleMaterial);
+            scene.add(particleSystem);
+        }
+        
+        // Initialize WebGL for simulation
+        function initSimulationWebGL() {
+            // We use the renderer's context
+            const gl = renderer.getContext();
+            
+            // Create framebuffer for simulation
+            simulationFramebuffer = gl.createFramebuffer();
+            
+            // Load shaders and create programs
+            loadSimulationPrograms();
+        }
+        
+        // Load simulation shader programs
+        function loadSimulationPrograms() {
+            // This is where we would normally load shaders from files
+            // For simplicity in this standalone HTML, we'll define them inline
+            
+            // Basic vertex shader for full-screen quad
+            const fullscreenVertShader = `
+                attribute vec2 a_position;
+                varying vec2 v_texCoord;
+                
+                void main() {
+                    v_texCoord = a_position * 0.5 + 0.5;
+                    gl_Position = vec4(a_position, 0.0, 1.0);
+                }
+            `;
+            
+            // Transfer to grid fragment shader
+            const transferToGridFragShader = `
+                precision highp float;
+                
+                uniform sampler2D u_positionTexture;
+                uniform sampler2D u_velocityTexture;
+                uniform vec3 u_gridResolution;
+                uniform vec3 u_gridSize;
+                uniform int u_accumulate;
+                uniform float u_zOffset;
+                
+                varying vec2 v_texCoord;
+                
+                void main() {
+                    vec4 position = texture2D(u_positionTexture, v_texCoord);
+                    vec4 velocity = texture2D(u_velocityTexture, v_texCoord);
+                    
+                    // Add z offset for splat
+                    float z = position.z + u_zOffset;
+                    
+                    // Convert world position to grid space
+                    vec3 gridPos = vec3(
+                        (position.x + u_gridSize.x/2.0) / u_gridSize.x * u_gridResolution.x,
+                        (position.y + u_gridSize.y/2.0) / u_gridSize.y * u_gridResolution.y,
+                        (z + u_gridSize.z/2.0) / u_gridSize.z * u_gridResolution.z
+                    );
+                    
+                    // Sample weight based on distance
+                    float weight = 1.0 - length(v_texCoord - vec2(0.5)) * 2.0;
+                    weight = max(0.0, weight);
+                    
+                    if (u_accumulate == 0) {
+                        // Accumulate weight
+                        gl_FragColor = vec4(weight, weight, weight, weight);
+                    } else {
+                        // Accumulate weighted velocity
+                        gl_FragColor = velocity * weight;
+                    }
+                }
+            `;
+            
+            // Create programs object
+            simulationPrograms = {
+                // We would create all needed programs here
+                transferToGrid: createProgram(fullscreenVertShader, transferToGridFragShader)
+            };
+            
+            // Create other program shaders here...
+        }
+        
+        // Helper to create WebGL program from shaders
+        function createProgram(vertexShaderSource, fragmentShaderSource) {
+            const gl = renderer.getContext();
+            
+            // Create shaders
+            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vertexShaderSource);
+            gl.compileShader(vertexShader);
+            
+            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fragmentShaderSource);
+            gl.compileShader(fragmentShader);
+            
+            // Create program and attach shaders
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            
+            // Check for errors
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Failed to link program:', gl.getProgramInfoLog(program));
+                gl.deleteProgram(program);
+                return null;
+            }
+            
+            return program;
+        }
+        
+        // Initialize simulation textures
+        function initializeSimulationTextures() {
+            // In a full implementation, we would create the following textures:
+            // 1. Velocity texture (for MAC grid)
+            // 2. Weight texture
+            // 3. Marker texture (fluid/air)
+            // 4. Pressure texture
+            // 5. Divergence texture
+            
+            // For this simplified version, we'll just create placeholder textures
+            // and implement the core simulation steps
+        }
+        
+        // presets buttons
+        function applyPreset(presetName) {
+            // Update active button styling
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Find the button for this preset and activate it
+            const presetButton = document.getElementById(`preset-${presetName}`);
+            if (presetButton) {
+                presetButton.classList.add('active');
+            }
+            
+            if (presetName === 'water') {
+                // Blue water-like fluid
+                particleMaterial.color.set(0x2389da);
+                particleMaterial.size = params.sphereRadius * 2;
+                particleMaterial.opacity = 0.6;
+                particleMaterial.blending = THREE.AdditiveBlending;
+                
+                // Update sliders
+                document.getElementById('fluidity').value = 0.95;
+                document.getElementById('fluidity-value').textContent = "0.95";
+                params.flipness = 0.95;
+                
+                document.getElementById('speed').value = 0.4; // Lower speed
+                document.getElementById('speed-value').textContent = "0.4";
+                params.timeScale = 0.4;
+                
+                // Calm fluid-specific parameters
+                params.viscosity = 2.5;        // Very high viscosity for better settling
+                params.pressureStiffness = 20.0; // Higher pressure to maintain spacing
+                params.surfaceTension = 1.0;   // Moderate surface tension
+                params.restitution = 0.05;     // Almost no bounce
+            } else if (presetName === 'blocks') {
+                // More viscous, blocky fluid
+                particleMaterial.color.set(0xdddddd);
+                particleMaterial.size = params.sphereRadius * 1.5;
+                particleMaterial.opacity = 0.8;
+                particleMaterial.blending = THREE.NormalBlending;
+                
+                // Update sliders
+                document.getElementById('fluidity').value = 0.7;
+                document.getElementById('fluidity-value').textContent = "0.70";
+                params.flipness = 0.7;
+                
+                document.getElementById('speed').value = 0.4; // Lower speed
+                document.getElementById('speed-value').textContent = "0.4";
+                params.timeScale = 0.4;
+                
+                // Block-specific parameters
+                params.viscosity = 3.0;        // Even more viscous
+                params.pressureStiffness = 30.0; // Stronger pressure
+                params.surfaceTension = 1.5;   // Stronger surface tension
+                params.restitution = 0.05;     // Almost no bounce
+            } else if (presetName === 'spheres') {
+                // Perfect spherical appearance
+                particleMaterial.color.set(0x4fadff);
+                particleMaterial.size = params.sphereRadius * 2.5;
+                particleMaterial.opacity = 0.9;
+                particleMaterial.blending = THREE.NormalBlending;
+                
+                // Enable depth write for more solid-looking spheres
+                particleMaterial.depthWrite = true;
+                
+                // Update sliders
+                document.getElementById('fluidity').value = 0.85;
+                document.getElementById('fluidity-value').textContent = "0.85";
+                params.flipness = 0.85;
+                
+                document.getElementById('speed').value = 0.4; // Lower speed
+                document.getElementById('speed-value').textContent = "0.4";
+                params.timeScale = 0.4;
+                
+                // Sphere-specific parameters
+                params.viscosity = 2.0;        // Higher viscosity
+                params.pressureStiffness = 25.0; // Higher pressure
+                params.surfaceTension = 2.0;   // High surface tension for spherical shape
+                params.restitution = 0.05;     // Almost no bounce
+            } else if (presetName === 'static') {
+                // Static water that barely moves
+                particleMaterial.color.set(0x00aaff);
+                particleMaterial.size = params.sphereRadius * 2;
+                particleMaterial.opacity = 0.7;
+                particleMaterial.blending = THREE.AdditiveBlending;
+                
+                // Update sliders
+                document.getElementById('fluidity').value = 0.6; // Lower FLIP value for more stability
+                document.getElementById('fluidity-value').textContent = "0.60";
+                params.flipness = 0.6;
+                
+                document.getElementById('speed').value = 0.2; // Very low speed
+                document.getElementById('speed-value').textContent = "0.2";
+                params.timeScale = 0.2;
+                
+                // Static fluid parameters - extreme values for minimal movement
+                params.viscosity = 5.0;        // Extremely high viscosity
+                params.pressureStiffness = 40.0; // Very high pressure for rigid structure
+                params.surfaceTension = 3.0;   // Very high surface tension
+                params.restitution = 0.01;     // Practically no bounce
+            }
+            
+            updateDerivedParameters();
+            resetSimulation();
+        }
+        
+        //TEMPORARY FIX!!!!!!! extra damping should not be needed later on if properly initiated obj bounds
+        function applyExtraDamping() {
+            // Apply stronger velocity cap
+            for (let i = 0; i < params.particleCount; i++) {
+                // Detect if particle is near bottom of container
+                const py = particlePositions[i * 4 + 1];
+                const bottomDistance = py - (-params.gridHeight/2 + params.particleRadius);
+                
+                // Particles near bottom get extra damping
+                if (bottomDistance < params.particleRadius * 3) {
+                    // Apply stronger damping to particles near the bottom
+                    const bottomDamping = 0.9; // 10% velocity reduction
+                    particleVelocities[i * 4] *= bottomDamping;
+                    particleVelocities[i * 4 + 1] *= bottomDamping;
+                    particleVelocities[i * 4 + 2] *= bottomDamping;
+                    
+                    // Also apply a small downward force to keep particles on the bottom
+                    particleVelocities[i * 4 + 1] -= 0.05;
+                }
+            }
+        }
+
+        // TEMPORARY FIX!!!!! for even more extreme calming, run a separate pass to stabilize particles
+        function stabilizeFluid() {
+            // Detect when particles are in a stable configuration and almost stop them
+            // This is a heuristic that looks for particles that have settled into a layer
+            
+            // First identify which particles are in stable layers
+            const layerHeight = params.particleRadius * 2.5;
+            const layerCounts = new Array(20).fill(0); // Count particles in each layer
+            
+            // Count particles per horizontal layer
+            for (let i = 0; i < params.particleCount; i++) {
+                const py = particlePositions[i * 4 + 1];
+                const layerIndex = Math.floor((py + params.gridHeight/2) / layerHeight);
+                
+                if (layerIndex >= 0 && layerIndex < layerCounts.length) {
+                    layerCounts[layerIndex]++;
+                }
+            }
+            
+            // Identify dense layers (many particles in same horizontal slice)
+            const denseThreshold = params.particleCount / layerCounts.length * 1.5;
+            const denseLayerIndices = [];
+            
+            for (let i = 0; i < layerCounts.length; i++) {
+                if (layerCounts[i] > denseThreshold) {
+                    denseLayerIndices.push(i);
+                }
+            }
+            
+            // If we have dense layers, stabilize particles in them
+            if (denseLayerIndices.length > 0) {
+                for (let i = 0; i < params.particleCount; i++) {
+                    const py = particlePositions[i * 4 + 1];
+                    const layerIndex = Math.floor((py + params.gridHeight/2) / layerHeight);
+                    
+                    // Check if this particle is in a dense layer
+                    if (denseLayerIndices.includes(layerIndex)) {
+                        // If particle is in a dense layer, heavily damp its velocity
+                        const stabilizationFactor = 0.8; // 20% velocity reduction
+                        particleVelocities[i * 4] *= stabilizationFactor;
+                        particleVelocities[i * 4 + 1] *= stabilizationFactor;
+                        particleVelocities[i * 4 + 2] *= stabilizationFactor;
+                        
+                        // If particle is moving very slowly, stop it completely
+                        const vx = particleVelocities[i * 4];
+                        const vy = particleVelocities[i * 4 + 1];
+                        const vz = particleVelocities[i * 4 + 2];
+                        
+                        const velMagSquared = vx*vx + vy*vy + vz*vz;
+                        
+                        if (velMagSquared < 0.01) {
+                            particleVelocities[i * 4] = 0;
+                            particleVelocities[i * 4 + 1] = 0;
+                            particleVelocities[i * 4 + 2] = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Initialize event listeners
+        function initEventListeners() {
+            // UI Event listeners
+            document.querySelector('.toggle-panel').addEventListener('click', () => {
+                document.querySelector('.sim-controls').classList.toggle('hidden');
+            });
+            
+            document.getElementById('particle-count').addEventListener('input', (e) => {
+                const newParticleCount = parseInt(e.target.value);
+                document.getElementById('particle-count-value').textContent = newParticleCount;
+                
+                // Store previous count for proper transition
+                const oldParticleCount = params.particleCount;
+                params.particleCount = newParticleCount;
+                
+                // Update derived parameters
+                updateDerivedParameters();
+                
+                // Handle the change in particle count
+                updateParticleCount(oldParticleCount, newParticleCount);
+            });
+            
+            document.getElementById('fluidity').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('fluidity-value').textContent = value.toFixed(2);
+                params.flipness = value;
+            });
+            
+            document.getElementById('speed').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('speed-value').textContent = value.toFixed(1);
+                params.timeScale = value;
+            });
+            
+            document.getElementById('radius').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('radius-value').textContent = value.toFixed(2);
+                params.sphereRadius = value;
+                
+                // Update particle size
+                if (particleMaterial) {
+                    particleMaterial.size = params.sphereRadius * 2;
+                }
+
+                updateDerivedParameters();
+            });
+
+
+            //TEMPORARY FIX!!!!!!
+            // document.addEventListener('DOMContentLoaded', function() {
+            //     // Find the spheres button and attach event listener directly
+            //     const spheresButton = document.getElementById('preset-spheres');
+            //     if (spheresButton) {
+            //         spheresButton.addEventListener('click', function() {
+            //             applyPreset('spheres');
+            //         });
+            //     }
+            // });
+
+            
+            document.getElementById('render-style').addEventListener('change', (e) => {
+                params.renderStyle = e.target.value;
+                updateRenderStyle();
+            });
+            
+            document.getElementById('reset-sim').addEventListener('click', resetSimulation);
+            document.getElementById('drop-particles').addEventListener('click', dropParticleBlock);
+            
+            // Pause button event listener
+            document.getElementById('pause-button').addEventListener('click', toggleSimulationPause);
+            
+            // File input event listener
+            const fileInput = document.getElementById('obj-file');
+            fileInput.addEventListener('change', function(e) {
+                const fileName = e.target.files[0] ? e.target.files[0].name : 'Choose File';
+                document.getElementById('file-name-display').textContent = fileName;
+                
+                // Enable or disable the load button
+                document.getElementById('load-model').disabled = !e.target.files[0];
+            });
+            
+            // Load model button event listener
+            document.getElementById('load-model').addEventListener('click', function() {
+                const fileInput = document.getElementById('obj-file');
+                if (fileInput.files.length === 0) return;
+                
+                loadOBJModel(fileInput.files[0]);
+            });
+            
+            // Preset buttons
+            document.getElementById('preset-water').addEventListener('click', () => applyPreset('water'));
+            document.getElementById('preset-blocks').addEventListener('click', () => applyPreset('blocks'));
+            
+            // Window resize event
+            window.addEventListener('resize', onWindowResize);
+            
+            // Mouse events for model interaction
+            renderer.domElement.addEventListener('mousedown', onMouseDown);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('mouseup', onMouseUp);
+            
+            // Keyboard events
+            window.addEventListener('keydown', (event) => {
+                if (event.key === ' ') {
+                    toggleSimulationPause();
+                }
+                if (event.key === 'r') {
+                    resetSimulation();
+                }
+                if (event.key === 'd') {
+                    dropParticleBlock();
+                }
+            });
+        }
+
+        // Create a new initialization function that properly places particles
+        function initializeBlockMode() {
+            // Calculate bounds to center the particles
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            // Size of the block of particles (50% of grid size for a more stable configuration)
+            const blockWidth = params.gridWidth * 0.5;
+            const blockHeight = params.gridHeight * 0.3; // Lower height creates a flatter starting shape
+            const blockDepth = params.gridDepth * 0.5;
+            
+            // Calculate particle spacing for a stable configuration
+            const particleSpacing = params.particleRadius * 2.2; // Slightly larger than diameter
+            
+            // Calculate the number of particles that can fit in each dimension
+            const numX = Math.floor(blockWidth / particleSpacing);
+            const numY = Math.floor(blockHeight / particleSpacing);
+            const numZ = Math.floor(blockDepth / particleSpacing);
+            
+            // Calculate offsets to center the block
+            const offsetX = -halfWidth + (params.gridWidth - numX * particleSpacing) / 2;
+            const offsetY = -halfHeight + (params.gridHeight - numY * particleSpacing) * 0.2; // Place closer to bottom
+            const offsetZ = -halfDepth + (params.gridDepth - numZ * particleSpacing) / 2;
+            
+            // Place particles in a grid
+            let particleIndex = 0;
+            for (let y = 0; y < numY && particleIndex < params.particleCount; y++) {
+                for (let z = 0; z < numZ && particleIndex < params.particleCount; z++) {
+                    for (let x = 0; x < numX && particleIndex < params.particleCount; x++) {
+                        // Calculate position with minimal jitter (0.05 * spacing)
+                        const posX = offsetX + x * particleSpacing + (Math.random() * 0.05 - 0.025) * particleSpacing;
+                        const posY = offsetY + y * particleSpacing + (Math.random() * 0.05 - 0.025) * particleSpacing;
+                        const posZ = offsetZ + z * particleSpacing + (Math.random() * 0.05 - 0.025) * particleSpacing;
+                        
+                        // Set position
+                        particlePositions[particleIndex * 4] = posX;
+                        particlePositions[particleIndex * 4 + 1] = posY;
+                        particlePositions[particleIndex * 4 + 2] = posZ;
+                        particlePositions[particleIndex * 4 + 3] = 0.0; // Not used
+                        
+                        // Initialize velocity with very slight randomness
+                        // Minimal initial velocity to avoid the "exploding" effect
+                        particleVelocities[particleIndex * 4] = (Math.random() - 0.5) * 0.01;
+                        particleVelocities[particleIndex * 4 + 1] = (Math.random() - 0.5) * 0.01;
+                        particleVelocities[particleIndex * 4 + 2] = (Math.random() - 0.5) * 0.01;
+                        particleVelocities[particleIndex * 4 + 3] = 0.0; // Not used
+                        
+                        particleIndex++;
+                    }
+                }
+            }
+            
+            // Fill any remaining particles (in case the grid didn't accommodate all)
+            while (particleIndex < params.particleCount) {
+                particlePositions[particleIndex * 4] = offsetX + Math.random() * blockWidth;
+                particlePositions[particleIndex * 4 + 1] = offsetY + Math.random() * blockHeight;
+                particlePositions[particleIndex * 4 + 2] = offsetZ + Math.random() * blockDepth;
+                particlePositions[particleIndex * 4 + 3] = 0.0;
+                
+                particleVelocities[particleIndex * 4] = (Math.random() - 0.5) * 0.01;
+                particleVelocities[particleIndex * 4 + 1] = (Math.random() - 0.5) * 0.01;
+                particleVelocities[particleIndex * 4 + 2] = (Math.random() - 0.5) * 0.01;
+                particleVelocities[particleIndex * 4 + 3] = 0.0;
+                
+                particleIndex++;
+            }
+        }
+        
+        // Set up disintegration feature
+        function setupDisintegration() {
+            let disintegrateProgress = 0;
+            let isDisintegrating = false;
+            let disintegrateInterval = null;
+            const maxDisintegrateTime = 3000; // 3 seconds to disintegrate
+            const progressBar = document.querySelector('.progress-bar');
+            const disintegrateButton = document.getElementById('disintegrate-button');
+            
+            // Disintegrate button events
+            disintegrateButton.addEventListener('mousedown', function() {
+                if (!loadedModel) return;
+                
+                isDisintegrating = true;
+                disintegrateProgress = 0;
+                
+                // Start progress
+                disintegrateInterval = setInterval(function() {
+                    disintegrateProgress += 10;
+                    const percent = Math.min(100, (disintegrateProgress / maxDisintegrateTime) * 100);
+                    progressBar.style.width = percent + '%';
+                    
+                    // Make the model glow
+                    if (loadedModel) {
+                        // Apply glow to all meshes
+                        loadedModel.traverse(function(child) {
+                            if (child.isMesh) {
+                                // Increase emission/glow intensity
+                                if (!child.material.userData.originalColor) {
+                                    child.material.userData.originalColor = child.material.color.clone();
+                                }
+                                
+                                // Transition from original color to bright red/orange
+                                const glowIntensity = percent / 100;
+                                const color = new THREE.Color().lerpColors(
+                                    child.material.userData.originalColor,
+                                    new THREE.Color(1, 0.3, 0),
+                                    glowIntensity
+                                );
+                                
+                                child.material.color.copy(color);
+                                child.material.emissive = new THREE.Color(color.r * glowIntensity, 
+                                                                        color.g * glowIntensity * 0.3, 
+                                                                        0);
+                                
+                                // Make it more transparent when close to disintegration
+                                if (percent > 80) {
+                                    child.material.opacity = 1 - ((percent - 80) / 20);
+                                }
+                            }
+                        });
+                        
+                        // Add particle effects when close to disintegration
+                        if (percent > 80) {
+                            const particleCount = Math.floor((percent - 80) / 5);
+                            spawnDisintegrationParticles(particleCount);
+                        }
+                    }
+                    
+                    // Check if disintegration is complete
+                    if (disintegrateProgress >= maxDisintegrateTime) {
+                        clearInterval(disintegrateInterval);
+                        disintegrateInterval = null;
+                        isDisintegrating = false;
+                        
+                        // Disintegrate the model with explosion
+                        if (loadedModel) {
+                            // Create explosion effect
+                            createExplosionEffect(loadedModel);
+                            
+                            // Then remove the model
+                            scene.remove(loadedModel);
+                            loadedModel = null;
+                            modelMeshes = [];
+                            progressBar.style.width = '0%';
+                        }
+                    }
+                }, 10);
+            });
+            
+            // Cancel disintegration when mouse is released
+            disintegrateButton.addEventListener('mouseup', cancelDisintegration);
+            disintegrateButton.addEventListener('mouseleave', cancelDisintegration);
+            
+            function cancelDisintegration() {
+                if (!isDisintegrating) return;
+                
+                isDisintegrating = false;
+                clearInterval(disintegrateInterval);
+                
+                // Animate the progress bar back to 0
+                const initialProgress = disintegrateProgress;
+                const reverseStartTime = Date.now();
+                const reverseDuration = 1000; // 1 second to reverse
+                
+                const reverseProgress = setInterval(function() {
+                    const elapsed = Date.now() - reverseStartTime;
+                    const t = Math.min(1, elapsed / reverseDuration);
+                    
+                    // Easing function for smooth reversal
+                    const easeOut = 1 - Math.pow(1 - t, 2);
+                    
+                    disintegrateProgress = initialProgress * (1 - easeOut);
+                    
+                    if (disintegrateProgress <= 0 || t >= 1) {
+                        disintegrateProgress = 0;
+                        clearInterval(reverseProgress);
+                        progressBar.style.width = '0%';
+                        
+                        // Reset model appearance
+                        if (loadedModel) {
+                            loadedModel.traverse(function(child) {
+                                if (child.isMesh && child.material.userData.originalColor) {
+                                    child.material.color.copy(child.material.userData.originalColor);
+                                    child.material.emissive = new THREE.Color(0, 0, 0);
+                                    child.material.opacity = 0.7;
+                                }
+                            });
+                        }
+                    } else {
+                        const percent = (disintegrateProgress / maxDisintegrateTime) * 100;
+                        progressBar.style.width = percent + '%';
+                        
+                        // Update model glow to match progress
+                        if (loadedModel) {
+                            loadedModel.traverse(function(child) {
+                                if (child.isMesh && child.material.userData.originalColor) {
+                                    // Calculate glowIntensity based on current progress
+                                    const glowIntensity = percent / 100;
+                                    
+                                    // Smoothly transition color back to original
+                                    const color = new THREE.Color().lerpColors(
+                                        child.material.userData.originalColor,
+                                        new THREE.Color(1, 0.3, 0),
+                                        glowIntensity
+                                    );
+                                    
+                                    child.material.color.copy(color);
+                                    child.material.emissive = new THREE.Color(
+                                        color.r * glowIntensity, 
+                                        color.g * glowIntensity * 0.3, 
+                                        0
+                                    );
+                                    
+                                    // Restore opacity
+                                    child.material.opacity = 0.7;
+                                }
+                            });
+                        }
+                    }
+                }, 16); // 60fps
+            }
+        }
+        
+        // Create explosion effect for disintegration
+        function createExplosionEffect(model) {
+            // Store the model's position and size before removing it
+            const modelPosition = model.position.clone();
+            const boundingBox = new THREE.Box3().setFromObject(model);
+            const modelSize = new THREE.Vector3();
+            boundingBox.getSize(modelSize);
+            
+            // Create explosion particles
+            const explosionParticleCount = 150;
+            const explosionRadius = Math.max(modelSize.x, modelSize.y, modelSize.z) / 2;
+            
+            // Determine color from model
+            let explosionColor = new THREE.Color(0xffffff); // Default white
+            
+            model.traverse(function(child) {
+                if (child.isMesh && child.material.userData.originalColor) {
+                    explosionColor = child.material.userData.originalColor;
+                }
+            });
+            
+            // Create explosive particles at the model's position
+            for (let i = 0; i < explosionParticleCount; i++) {
+                // Get a random direction for the particle
+                const phi = Math.random() * Math.PI * 2;
+                const theta = Math.random() * Math.PI;
+                const radius = explosionRadius * (0.3 + Math.random() * 0.7);
+                
+                // Calculate position (spherical coordinates)
+                const x = modelPosition.x + radius * Math.sin(theta) * Math.cos(phi);
+                const y = modelPosition.y + radius * Math.sin(theta) * Math.sin(phi);
+                const z = modelPosition.z + radius * Math.cos(theta);
+                
+                // Create explosion particle
+                createExplosionParticle(
+                    new THREE.Vector3(x, y, z),
+                    new THREE.Vector3(
+                        (x - modelPosition.x) * (0.5 + Math.random() * 0.5) * 0.1,
+                        (y - modelPosition.y) * (0.5 + Math.random() * 0.5) * 0.1,
+                        (z - modelPosition.z) * (0.5 + Math.random() * 0.5) * 0.1
+                    ),
+                    explosionColor
+                );
+            }
+        }
+        
+        // Create a single explosion particle
+        function createExplosionParticle(position, velocity, color) {
+            // Use existing particles from the simulation for the explosion effect
+            const particleIndex = Math.floor(Math.random() * params.particleCount);
+            
+            // Set position
+            particlePositions[particleIndex * 4] = position.x;
+            particlePositions[particleIndex * 4 + 1] = position.y;
+            particlePositions[particleIndex * 4 + 2] = position.z;
+            
+            // Set velocity
+            particleVelocities[particleIndex * 4] = velocity.x * 20;     // Scale for more explosive effect
+            particleVelocities[particleIndex * 4 + 1] = velocity.y * 20;
+            particleVelocities[particleIndex * 4 + 2] = velocity.z * 20;
+            
+            // Update the three.js buffer
+            particleSystem.geometry.attributes.position.array[particleIndex * 3] = position.x;
+            particleSystem.geometry.attributes.position.array[particleIndex * 3 + 1] = position.y;
+            particleSystem.geometry.attributes.position.array[particleIndex * 3 + 2] = position.z;
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // Spawn particles during disintegration
+        function spawnDisintegrationParticles(count) {
+            if (!loadedModel) return;
+            
+            // Get the bounding box of the model
+            const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+            const center = new THREE.Vector3();
+            boundingBox.getCenter(center);
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            
+            // Spawn particles from random points on the model
+            for (let i = 0; i < count; i++) {
+                // Find a random position within the bounding box
+                const x = center.x + (Math.random() - 0.5) * size.x;
+                const y = center.y + (Math.random() - 0.5) * size.y;
+                const z = center.z + (Math.random() - 0.5) * size.z;
+                
+                // Pick a random particle for this effect
+                const particleIndex = Math.floor(Math.random() * params.particleCount);
+                
+                // Set its position to the random location on the model
+                particlePositions[particleIndex * 4] = x;
+                particlePositions[particleIndex * 4 + 1] = y;
+                particlePositions[particleIndex * 4 + 2] = z;
+                
+                // Give it an outward velocity from the center
+                const direction = new THREE.Vector3(x - center.x, y - center.y, z - center.z).normalize();
+                particleVelocities[particleIndex * 4] = direction.x * 10;
+                particleVelocities[particleIndex * 4 + 1] = direction.y * 10;
+                particleVelocities[particleIndex * 4 + 2] = direction.z * 10;
+                
+                // Update the three.js buffer
+                particleSystem.geometry.attributes.position.array[particleIndex * 3] = x;
+                particleSystem.geometry.attributes.position.array[particleIndex * 3 + 1] = y;
+                particleSystem.geometry.attributes.position.array[particleIndex * 3 + 2] = z;
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // Reset the simulation
+        function resetSimulation() {
+            // Properly re-initialize particles with updated parameters
+            initializeBlockMode();
+            
+            // Update the displayed positions in three.js
+            for (let i = 0; i < params.particleCount; i++) {
+                particleSystem.geometry.attributes.position.array[i * 3] = particlePositions[i * 4];
+                particleSystem.geometry.attributes.position.array[i * 3 + 1] = particlePositions[i * 4 + 1];
+                particleSystem.geometry.attributes.position.array[i * 3 + 2] = particlePositions[i * 4 + 2];
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Drop a block of particles
+        function dropParticleBlock() {
+            // Calculate grid center
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            // Size of the drop block (30% of grid size)
+            const dropSize = params.gridWidth * 0.3;
+            
+            // Number of particles to drop (20% of total)
+            const particlesToDrop = Math.floor(params.particleCount * 0.2);
+            
+            // Particle spacing for the drop (avoid initial overlap)
+            const spacing = params.particleRadius * 2.2;
+            const particlesPerSide = Math.cbrt(particlesToDrop);
+            const cubeSide = spacing * particlesPerSide;
+            
+            // Create a more organized block of particles
+            let particleIndex = 0;
+            for (let x = 0; x < particlesPerSide && particleIndex < particlesToDrop; x++) {
+                for (let y = 0; y < particlesPerSide && particleIndex < particlesToDrop; y++) {
+                    for (let z = 0; z < particlesPerSide && particleIndex < particlesToDrop; z++) {
+                        // Select a random particle to replace
+                        const idx = Math.floor(Math.random() * params.particleCount);
+                        
+                        // Calculate organized position with slight jitter
+                        const posX = (x - particlesPerSide/2) * spacing + (Math.random() * 0.1 - 0.05) * spacing;
+                        const posY = halfHeight - 2; // Just below the top
+                        const posZ = (z - particlesPerSide/2) * spacing + (Math.random() * 0.1 - 0.05) * spacing;
+                        
+                        // Set position
+                        particlePositions[idx * 4] = posX;
+                        particlePositions[idx * 4 + 1] = posY;
+                        particlePositions[idx * 4 + 2] = posZ;
+                        
+                        // Add downward velocity with slight randomness
+                        particleVelocities[idx * 4] = (Math.random() - 0.5) * 0.5;
+                        particleVelocities[idx * 4 + 1] = -5 - Math.random() * 2;
+                        particleVelocities[idx * 4 + 2] = (Math.random() - 0.5) * 0.5;
+                        
+                        // Update the three.js buffer
+                        particleSystem.geometry.attributes.position.array[idx * 3] = particlePositions[idx * 4];
+                        particleSystem.geometry.attributes.position.array[idx * 3 + 1] = particlePositions[idx * 4 + 1];
+                        particleSystem.geometry.attributes.position.array[idx * 3 + 2] = particlePositions[idx * 4 + 2];
+                        
+                        particleIndex++;
+                    }
+                }
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // Update render style
+        function updateRenderStyle() {
+            if (!particleMaterial) return;
+            
+            switch (params.renderStyle) {
+                case 'points':
+                    particleMaterial.size = params.sphereRadius * 1.5;
+                    particleMaterial.opacity = 0.8;
+                    particleMaterial.blending = THREE.NormalBlending;
+                    break;
+                    
+                case 'metaballs':
+                    particleMaterial.size = params.sphereRadius * 2;
+                    particleMaterial.opacity = 0.6;
+                    particleMaterial.blending = THREE.AdditiveBlending;
+                    break;
+                    
+                case 'surface':
+                    particleMaterial.size = params.sphereRadius * 2.2;
+                    particleMaterial.opacity = 0.4;
+                    particleMaterial.blending = THREE.AdditiveBlending;
+                    break;
+            }
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Toggle pause/play simulation
+        function toggleSimulationPause() {
+            isSimulationPaused = !isSimulationPaused;
+            
+            // Update button text
+            const pauseButton = document.getElementById('pause-button');
+            const pauseText = document.getElementById('pause-text');
+            const pauseIcon = document.getElementById('pause-icon');
+            
+            if (isSimulationPaused) {
+                pauseText.textContent = 'Resume';
+                pauseIcon.textContent = '▶️';
+            } else {
+                pauseText.textContent = 'Pause';
+                pauseIcon.textContent = '⏸️';
+            }
+        }
+        
+        // Update FPS counter
+        function updateFPSCounter(now) {
+            frameCount++;
+            
+            if (now - fpsLastUpdate >= fpsUpdateInterval) {
+                const fps = Math.round((frameCount * 1000) / (now - fpsLastUpdate));
+                document.getElementById('fps-counter').textContent = fps;
+                fpsLastUpdate = now;
+                frameCount = 0;
+            }
+        }
+        
+        // Load OBJ Model
+        function loadOBJModel(file) {
+            // Remove existing model if any
+            if (loadedModel) {
+                scene.remove(loadedModel);
+                loadedModel = null;
+                modelMeshes = [];
+            }
+            
+            // Create a file URL
+            const fileURL = URL.createObjectURL(file);
+            
+            // Create OBJ loader
+            const objLoader = new THREE.OBJLoader();
+            
+            // Start loading
+            objLoader.load(
+                fileURL,
+                // onLoad callback
+                function(object) {
+                    // Calculate the bounding box to get dimensions
+                    const boundingBox = new THREE.Box3().setFromObject(object);
+                    const size = new THREE.Vector3();
+                    boundingBox.getSize(size);
+                    
+                    // Find the largest dimension
+                    const maxDimension = Math.max(size.x, size.y, size.z);
+                    
+                    // Calculate scaling factor to make largest dimension half the box width
+                    const targetSize = params.gridWidth / 2.5; // Slightly smaller than half
+                    const scaleFactor = targetSize / maxDimension;
+                    
+                    // Apply scaling
+                    object.scale.set(scaleFactor, scaleFactor, scaleFactor);
+                    object.position.set(0, 0, 0);
+                    
+                    // Initialize physics properties
+                    object.userData = {
+                        velocity: new THREE.Vector3(0, 0, 0),
+                        angularVelocity: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5
+                        ),
+                        isDragging: false,
+                        isDraggable: true,
+                        mass: 1.0,
+                        dragStartRotation: new THREE.Euler()
+                    };
+                    
+                    // Apply materials and store meshes
+                    object.traverse(function(child) {
+                        if (child.isMesh) {
+                            // Apply a standard material
+                            child.material = new THREE.MeshPhongMaterial({
+                                color: 0xcccccc,
+                                transparent: true,
+                                opacity: 0.7,
+                                side: THREE.DoubleSide,
+                                emissive: new THREE.Color(0, 0, 0),
+                                emissiveIntensity: 0
+                            });
+                            
+                            // Store meshes for collision detection
+                            modelMeshes.push({
+                                mesh: child,
+                                geometry: child.geometry,
+                                // Create bounding box for collision detection
+                                boundingBox: new THREE.Box3().setFromObject(child)
+                            });
+                        }
+                    });
+                    
+                    // Add to scene
+                    scene.add(object);
+                    loadedModel = object;
+                    
+                    // Release URL
+                    URL.revokeObjectURL(fileURL);
+                    
+                    console.log('Model loaded successfully', object);
+                },
+                // onProgress callback
+                function(xhr) {
+                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                // onError callback
+                function(error) {
+                    console.error('Error loading model:', error);
+                    URL.revokeObjectURL(fileURL);
+                }
+            );
+        }
+        
+        // Mouse interaction for model dragging
+        function onMouseDown(event) {
+            // Calculate mouse position in normalized device coordinates (-1 to +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Update the picking ray with the camera and mouse position
+            raycaster.setFromCamera(mouse, camera);
+            
+            // If we have a model, check for intersections
+            if (loadedModel) {
+                const intersects = raycaster.intersectObject(loadedModel, true);
+                
+                if (intersects.length > 0) {
+                    // Disable OrbitControls temporarily
+                    controls.enabled = false;
+                    
+                    // Start dragging
+                    isDragging = true;
+                    selectedObject = loadedModel;
+                    
+                    // Calculate the offset
+                    const intersectionPoint = intersects[0].point;
+                    dragOffset.copy(intersectionPoint).sub(loadedModel.position);
+                    
+                    // Store current rotation and physics state
+                    loadedModel.userData.dragStartRotation = loadedModel.rotation.clone();
+                    
+                    // Mark as being dragged
+                    loadedModel.userData.isDragging = true;
+                }
+            }
+        }
+        
+        function onMouseMove(event) {
+            if (isDragging && selectedObject) {
+                // Update mouse position
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Cast a ray from the camera to the mouse position
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Calculate a plane perpendicular to the camera direction
+                const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
+                const plane = new THREE.Plane(planeNormal, -selectedObject.position.z);
+                
+                // Find the point of intersection with the plane
+                const intersection = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersection);
+                
+                // Set object position, accounting for the offset
+                const newPosition = intersection.clone().sub(dragOffset);
+                
+                // Apply new position to object's physics state
+                selectedObject.userData.velocity.copy(newPosition.clone().sub(selectedObject.position).multiplyScalar(20));
+                selectedObject.position.copy(newPosition);
+                
+                // Update bounding boxes for collision
+                updateModelBoundingBoxes();
+            }
+        }
+        
+        function onMouseUp(event) {
+            if (isDragging) {
+                isDragging = false;
+                
+                if (selectedObject) {
+                    // Release the object but keep its momentum
+                    selectedObject.userData.isDragging = false;
+                    selectedObject = null;
+                }
+                
+                // Re-enable OrbitControls
+                controls.enabled = true;
+            }
+        }
+        
+        // Update model bounding boxes
+        function updateModelBoundingBoxes() {
+            if (loadedModel) {
+                modelMeshes = []; // Clear previous meshes
+                loadedModel.traverse(function(child) {
+                    if (child.isMesh) {
+                        const boundingBox = new THREE.Box3().setFromObject(child);
+                        modelMeshes.push({
+                            mesh: child,
+                            geometry: child.geometry,
+                            boundingBox: boundingBox
+                        });
+                    }
+                });
+            }
+        }
+        
+        // TEMPORARY FIX!!!!!! to completely reset particle velocities when they're moving very slowly
+        function updateVelocityDampingForCalm() {
+            for (let i = 0; i < params.particleCount; i++) {
+                // Get current velocity magnitude
+                const vx = particleVelocities[i * 4];
+                const vy = particleVelocities[i * 4 + 1];
+                const vz = particleVelocities[i * 4 + 2];
+                
+                const velMagSquared = vx*vx + vy*vy + vz*vz;
+                
+                // Much more aggressive velocity damping for stability
+                const stoppingThreshold = 0.05; // Higher threshold to stop particles
+                if (velMagSquared < stoppingThreshold * stoppingThreshold) {
+                    // Almost completely stop very slow particles
+                    particleVelocities[i * 4] *= 0.7;
+                    particleVelocities[i * 4 + 1] *= 0.7;
+                    particleVelocities[i * 4 + 2] *= 0.7;
+                    
+                    // If extremely slow, stop completely
+                    const nearZeroThreshold = 0.01;
+                    if (velMagSquared < nearZeroThreshold * nearZeroThreshold) {
+                        particleVelocities[i * 4] = 0;
+                        particleVelocities[i * 4 + 1] = 0;
+                        particleVelocities[i * 4 + 2] = 0;
+                    }
+                }
+            }
+        }
+
+        // Update object physics
+        function updateObjectPhysics(deltaTime) {
+            if (!loadedModel) return;
+            
+            // Apply physics if not being dragged
+            if (!loadedModel.userData.isDragging) {
+                // Apply gravity
+                loadedModel.userData.velocity.y -= 9.8 * deltaTime;
+                
+                // Apply velocity
+                loadedModel.position.add(loadedModel.userData.velocity.clone().multiplyScalar(deltaTime));
+                
+                // Apply angular velocity (rotation)
+                loadedModel.rotation.x += loadedModel.userData.angularVelocity.x * deltaTime;
+                loadedModel.rotation.y += loadedModel.userData.angularVelocity.y * deltaTime;
+                loadedModel.rotation.z += loadedModel.userData.angularVelocity.z * deltaTime;
+                
+                // Check boundary collisions
+                checkModelBoundaryCollision();
+                
+                // Apply damping to velocities
+                loadedModel.userData.velocity.multiplyScalar(0.99);
+                loadedModel.userData.angularVelocity.multiplyScalar(0.99);
+                
+                // Update model bounding boxes for collision
+                updateModelBoundingBoxes();
+            } else {
+                // Even when dragging, still apply rotation based on angular velocity
+                loadedModel.rotation.x += loadedModel.userData.angularVelocity.x * deltaTime * 0.5;
+                loadedModel.rotation.y += loadedModel.userData.angularVelocity.y * deltaTime * 0.5;
+                loadedModel.rotation.z += loadedModel.userData.angularVelocity.z * deltaTime * 0.5;
+            }
+        }
+        
+        // Check for model collisions with boundary
+        function checkModelBoundaryCollision() {
+            if (!loadedModel) return;
+            
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            const center = new THREE.Vector3();
+            boundingBox.getCenter(center);
+            
+            // Collision with X boundaries
+            if (center.x - size.x/2 < -halfWidth) {
+                loadedModel.position.x += (-halfWidth - (center.x - size.x/2));
+                loadedModel.userData.velocity.x *= -0.7; // Bounce with damping
+                // Add spin effect
+                loadedModel.userData.angularVelocity.z -= loadedModel.userData.velocity.y * 0.1;
+            }
+            else if (center.x + size.x/2 > halfWidth) {
+                loadedModel.position.x -= ((center.x + size.x/2) - halfWidth);
+                loadedModel.userData.velocity.x *= -0.7;
+                // Add spin effect
+                loadedModel.userData.angularVelocity.z += loadedModel.userData.velocity.y * 0.1;
+            }
+            
+            // Collision with Y boundaries
+            if (center.y - size.y/2 < -halfHeight) {
+                loadedModel.position.y += (-halfHeight - (center.y - size.y/2));
+                loadedModel.userData.velocity.y *= -0.7;
+                // Add spin based on x velocity
+                loadedModel.userData.angularVelocity.x += loadedModel.userData.velocity.x * 0.1;
+            }
+            else if (center.y + size.y/2 > halfHeight) {
+                loadedModel.position.y -= ((center.y + size.y/2) - halfHeight);
+                loadedModel.userData.velocity.y *= -0.7;
+                // Add spin based on x velocity
+                loadedModel.userData.angularVelocity.x -= loadedModel.userData.velocity.x * 0.1;
+            }
+            
+            // Collision with Z boundaries
+            if (center.z - size.z/2 < -halfDepth) {
+                loadedModel.position.z += (-halfDepth - (center.z - size.z/2));
+                loadedModel.userData.velocity.z *= -0.7;
+                // Add spin effect
+                loadedModel.userData.angularVelocity.x -= loadedModel.userData.velocity.y * 0.1;
+            }
+            else if (center.z + size.z/2 > halfDepth) {
+                loadedModel.position.z -= ((center.z + size.z/2) - halfDepth);
+                loadedModel.userData.velocity.z *= -0.7;
+                // Add spin effect
+                loadedModel.userData.angularVelocity.x += loadedModel.userData.velocity.y * 0.1;
+            }
+        }
+        
+
+        // Main simulation loop (update and render)
+        function updateSimulation(deltaTime) {
+            // Get grid dimensions for convenience
+            const gridWidth = params.gridWidth;
+            const gridHeight = params.gridHeight;
+            const gridDepth = params.gridDepth;
+            const gridResX = params.gridResolutionX;
+            const gridResY = params.gridResolutionY;
+            const gridResZ = params.gridResolutionZ;
+            
+            // Grid cell sizes
+            const cellSizeX = gridWidth / gridResX;
+            const cellSizeY = gridHeight / gridResY;
+            const cellSizeZ = gridDepth / gridResZ;
+            
+            // Grid origin (center of the simulation domain)
+            const originX = -gridWidth / 2;
+            const originY = -gridHeight / 2;
+            const originZ = -gridDepth / 2;
+            
+            // Temporary arrays for simulation
+            let velocityGrid = new Float32Array(gridResX * gridResY * gridResZ * 3);
+            let weightGrid = new Float32Array(gridResX * gridResY * gridResZ);
+            let divergenceGrid = new Float32Array(gridResX * gridResY * gridResZ);
+            let pressureGrid = new Float32Array(gridResX * gridResY * gridResZ);
+            let tempPressureGrid = new Float32Array(gridResX * gridResY * gridResZ);
+            let markerGrid = new Uint8Array(gridResX * gridResY * gridResZ); // 1 for fluid, 0 for air
+            let densityGrid = new Float32Array(gridResX * gridResY * gridResZ);
+            
+            // Function to get grid cell index
+            function getGridIndex(x, y, z) {
+                return (z * gridResY * gridResX) + (y * gridResX) + x;
+            }
+            
+            // Function to get spatial hash index for particle-particle interaction
+            // Using a more efficient spatial hash function
+            const particleRadius = params.sphereRadius * 0.8; // Slightly smaller than visual radius
+            const spatialHashCellSize = particleRadius * 2.5; // Larger interaction radius for smoother forces
+            const spatialHash = {};
+            
+            function getHashKey(x, y, z) {
+                // Use bit-shifting for faster hashing (can be even more optimized if needed)
+                const cellX = Math.floor(x / spatialHashCellSize);
+                const cellY = Math.floor(y / spatialHashCellSize);
+                const cellZ = Math.floor(z / spatialHashCellSize);
+                // Using string keys for simplicity, could be optimized with integer keys
+                return `${cellX},${cellY},${cellZ}`;
+            }
+            
+            // Build spatial hash for particle-particle interaction
+            for (let i = 0; i < params.particleCount; i++) {
+                const x = particlePositions[i * 4];
+                const y = particlePositions[i * 4 + 1];
+                const z = particlePositions[i * 4 + 2];
+                
+                const key = getHashKey(x, y, z);
+                if (!spatialHash[key]) {
+                    spatialHash[key] = [];
+                }
+                spatialHash[key].push(i);
+            }
+            
+            // Step 1: Transfer particle velocities and mass to grid using APIC (Affine Particle-In-Cell)
+            // This is a more accurate technique than simple trilinear interpolation
+            
+            // Reset grid values
+            for (let i = 0; i < velocityGrid.length; i++) {
+                velocityGrid[i] = 0;
+            }
+            for (let i = 0; i < weightGrid.length; i++) {
+                weightGrid[i] = 0;
+                markerGrid[i] = 0;
+                pressureGrid[i] = 0;
+                densityGrid[i] = 0;
+            }
+            
+            // Define kernel function for more accurate interpolation
+            function kernel(r, h) {
+                const q = r / h;
+                if (q > 1) return 0;
+                const q2 = q * q;
+                const q3 = q2 * q;
+                if (q < 0.5) {
+                    return 6 * (q3 - q2) + 1;
+                } else {
+                    return 2 * Math.pow(1 - q, 3);
+                }
+            }
+            
+            // For each particle, transfer mass and velocity to grid
+            for (let i = 0; i < params.particleCount; i++) {
+                const px = particlePositions[i * 4];
+                const py = particlePositions[i * 4 + 1];
+                const pz = particlePositions[i * 4 + 2];
+                
+                // Convert world position to grid position
+                const gridX = (px - originX) / cellSizeX;
+                const gridY = (py - originY) / cellSizeY;
+                const gridZ = (pz - originZ) / cellSizeZ;
+                
+                // Grid cell indices (floor to get base cell containing the particle)
+                const ix = Math.floor(gridX);
+                const iy = Math.floor(gridY);
+                const iz = Math.floor(gridZ);
+                
+                // Ensure we're within bounds
+                if (ix < 1 || ix >= gridResX - 2 || 
+                    iy < 1 || iy >= gridResY - 2 || 
+                    iz < 1 || iz >= gridResZ - 2) {
+                    continue;
+                }
+                
+                // We'll use a 3x3x3 stencil for better accuracy (unlike the 2x2x2 trilinear interpolation)
+                const kernelRadius = 2; // Radius of kernel support in grid cells
+                
+                // Particle velocity
+                const vx = particleVelocities[i * 4];
+                const vy = particleVelocities[i * 4 + 1];
+                const vz = particleVelocities[i * 4 + 2];
+                
+                // Mark fluid cells and accumulate density
+                // We'll mark cells as fluid if they have enough mass
+                for (let offsetZ = -kernelRadius; offsetZ <= kernelRadius; offsetZ++) {
+                    for (let offsetY = -kernelRadius; offsetY <= kernelRadius; offsetY++) {
+                        for (let offsetX = -kernelRadius; offsetX <= kernelRadius; offsetX++) {
+                            const nx = ix + offsetX;
+                            const ny = iy + offsetY;
+                            const nz = iz + offsetZ;
+                            
+                            // Skip out-of-bounds cells
+                            if (nx < 0 || nx >= gridResX || 
+                                ny < 0 || ny >= gridResY || 
+                                nz < 0 || nz >= gridResZ) {
+                                continue;
+                            }
+                            
+                            // Calculate distance from particle to cell center
+                            const dx = (nx + 0.5) - gridX;
+                            const dy = (ny + 0.5) - gridY;
+                            const dz = (nz + 0.5) - gridZ;
+                            const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                            
+                            // Weight based on distance
+                            const weight = kernel(distance, kernelRadius);
+                            
+                            if (weight > 0) {
+                                const cellIdx = getGridIndex(nx, ny, nz);
+                                
+                                // Accumulate mass and velocity
+                                weightGrid[cellIdx] += weight;
+                                velocityGrid[cellIdx * 3] += vx * weight;
+                                velocityGrid[cellIdx * 3 + 1] += vy * weight;
+                                velocityGrid[cellIdx * 3 + 2] += vz * weight;
+                                
+                                // Accumulate density
+                                densityGrid[cellIdx] += weight;
+                                
+                                // Mark as fluid cell if there's enough mass
+                                // This adaptive threshold works better than a fixed one
+                                if (weight > 0.1) {
+                                    markerGrid[cellIdx] = 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Normalize grid velocities
+            for (let i = 0; i < gridResX * gridResY * gridResZ; i++) {
+                if (weightGrid[i] > 0.0001) {
+                    velocityGrid[i * 3] /= weightGrid[i];
+                    velocityGrid[i * 3 + 1] /= weightGrid[i];
+                    velocityGrid[i * 3 + 2] /= weightGrid[i];
+                }
+            }
+            
+            // Save original velocity field for FLIP
+            const originalVelocityGrid = velocityGrid.slice();
+            
+            // Step 2: Apply external forces (gravity)
+            for (let i = 0; i < gridResX * gridResY * gridResZ; i++) {
+                if (weightGrid[i] > 0.0001) {
+                    // Apply gravity
+                    velocityGrid[i * 3 + 1] += -9.8 * deltaTime;
+                }
+            }
+            
+            // Step 3: Enforce boundary conditions
+            enforceBoundariesMACGrid(velocityGrid, markerGrid);
+            
+            // Step 4: Calculate divergence for pressure projection
+            computeDivergence(velocityGrid, divergenceGrid, markerGrid);
+            
+            // Step 5: Solve pressure Poisson equation using Jacobi iteration
+            solvePressure(pressureGrid, tempPressureGrid, divergenceGrid, markerGrid);
+            
+            // Step 6: Project velocities to be divergence-free
+            projectVelocity(velocityGrid, pressureGrid, markerGrid);
+            
+            // Step 7: Apply viscosity diffusion
+            applyViscosity(velocityGrid, markerGrid);
+            
+            // Step 8: Transfer velocities back to particles (PIC/FLIP)
+            for (let i = 0; i < params.particleCount; i++) {
+                const px = particlePositions[i * 4];
+                const py = particlePositions[i * 4 + 1];
+                const pz = particlePositions[i * 4 + 2];
+                
+                // Convert world position to grid coordinates
+                const gridX = (px - originX) / cellSizeX;
+                const gridY = (py - originY) / cellSizeY;
+                const gridZ = (pz - originZ) / cellSizeZ;
+                
+                // Grid cell indices
+                const ix = Math.floor(gridX);
+                const iy = Math.floor(gridY);
+                const iz = Math.floor(gridZ);
+                
+                // Check if we're within bounds
+                if (ix < 1 || ix >= gridResX - 2 || 
+                    iy < 1 || iy >= gridResY - 2 || 
+                    iz < 1 || iz >= gridResZ - 2) {
+                    // Keep current velocity for out-of-bounds particles
+                    continue;
+                }
+                
+                // Interpolation factors
+                const fx = gridX - ix;
+                const fy = gridY - iy;
+                const fz = gridZ - iz;
+                
+                // Trilinear interpolation weights
+                const w000 = (1 - fx) * (1 - fy) * (1 - fz);
+                const w001 = (1 - fx) * (1 - fy) * fz;
+                const w010 = (1 - fx) * fy * (1 - fz);
+                const w011 = (1 - fx) * fy * fz;
+                const w100 = fx * (1 - fy) * (1 - fz);
+                const w101 = fx * (1 - fy) * fz;
+                const w110 = fx * fy * (1 - fz);
+                const w111 = fx * fy * fz;
+                
+                // Grid indices
+                const idx000 = getGridIndex(ix, iy, iz);
+                const idx001 = getGridIndex(ix, iy, iz + 1);
+                const idx010 = getGridIndex(ix, iy + 1, iz);
+                const idx011 = getGridIndex(ix, iy + 1, iz + 1);
+                const idx100 = getGridIndex(ix + 1, iy, iz);
+                const idx101 = getGridIndex(ix + 1, iy, iz + 1);
+                const idx110 = getGridIndex(ix + 1, iy + 1, iz);
+                const idx111 = getGridIndex(ix + 1, iy + 1, iz + 1);
+                
+                // Interpolate grid velocity (PIC)
+                const gridVelX = 
+                    velocityGrid[idx000 * 3] * w000 +
+                    velocityGrid[idx001 * 3] * w001 +
+                    velocityGrid[idx010 * 3] * w010 +
+                    velocityGrid[idx011 * 3] * w011 +
+                    velocityGrid[idx100 * 3] * w100 +
+                    velocityGrid[idx101 * 3] * w101 +
+                    velocityGrid[idx110 * 3] * w110 +
+                    velocityGrid[idx111 * 3] * w111;
+                
+                const gridVelY = 
+                    velocityGrid[idx000 * 3 + 1] * w000 +
+                    velocityGrid[idx001 * 3 + 1] * w001 +
+                    velocityGrid[idx010 * 3 + 1] * w010 +
+                    velocityGrid[idx011 * 3 + 1] * w011 +
+                    velocityGrid[idx100 * 3 + 1] * w100 +
+                    velocityGrid[idx101 * 3 + 1] * w101 +
+                    velocityGrid[idx110 * 3 + 1] * w110 +
+                    velocityGrid[idx111 * 3 + 1] * w111;
+                
+                const gridVelZ = 
+                    velocityGrid[idx000 * 3 + 2] * w000 +
+                    velocityGrid[idx001 * 3 + 2] * w001 +
+                    velocityGrid[idx010 * 3 + 2] * w010 +
+                    velocityGrid[idx011 * 3 + 2] * w011 +
+                    velocityGrid[idx100 * 3 + 2] * w100 +
+                    velocityGrid[idx101 * 3 + 2] * w101 +
+                    velocityGrid[idx110 * 3 + 2] * w110 +
+                    velocityGrid[idx111 * 3 + 2] * w111;
+                
+                // Interpolate original grid velocity for FLIP component
+                const origGridVelX = 
+                    originalVelocityGrid[idx000 * 3] * w000 +
+                    originalVelocityGrid[idx001 * 3] * w001 +
+                    originalVelocityGrid[idx010 * 3] * w010 +
+                    originalVelocityGrid[idx011 * 3] * w011 +
+                    originalVelocityGrid[idx100 * 3] * w100 +
+                    originalVelocityGrid[idx101 * 3] * w101 +
+                    originalVelocityGrid[idx110 * 3] * w110 +
+                    originalVelocityGrid[idx111 * 3] * w111;
+                
+                const origGridVelY = 
+                    originalVelocityGrid[idx000 * 3 + 1] * w000 +
+                    originalVelocityGrid[idx001 * 3 + 1] * w001 +
+                    originalVelocityGrid[idx010 * 3 + 1] * w010 +
+                    originalVelocityGrid[idx011 * 3 + 1] * w011 +
+                    originalVelocityGrid[idx100 * 3 + 1] * w100 +
+                    originalVelocityGrid[idx101 * 3 + 1] * w101 +
+                    originalVelocityGrid[idx110 * 3 + 1] * w110 +
+                    originalVelocityGrid[idx111 * 3 + 1] * w111;
+                
+                const origGridVelZ = 
+                    originalVelocityGrid[idx000 * 3 + 2] * w000 +
+                    originalVelocityGrid[idx001 * 3 + 2] * w001 +
+                    originalVelocityGrid[idx010 * 3 + 2] * w010 +
+                    originalVelocityGrid[idx011 * 3 + 2] * w011 +
+                    originalVelocityGrid[idx100 * 3 + 2] * w100 +
+                    originalVelocityGrid[idx101 * 3 + 2] * w101 +
+                    originalVelocityGrid[idx110 * 3 + 2] * w110 +
+                    originalVelocityGrid[idx111 * 3 + 2] * w111;
+                
+                // FLIP: velocity = oldParticleVelocity + (newGridVelocity - oldGridVelocity)
+                // PIC: velocity = newGridVelocity
+                // Mix PIC and FLIP based on flipness parameter
+                const oldVelX = particleVelocities[i * 4];
+                const oldVelY = particleVelocities[i * 4 + 1];
+                const oldVelZ = particleVelocities[i * 4 + 2];
+                
+                const flipVelX = oldVelX + (gridVelX - origGridVelX);
+                const flipVelY = oldVelY + (gridVelY - origGridVelY);
+                const flipVelZ = oldVelZ + (gridVelZ - origGridVelZ);
+                
+                // Use slightly more PIC for stability, then mix with FLIP for detail
+                particleVelocities[i * 4] = gridVelX * (1.0 - params.flipness) + flipVelX * params.flipness;
+                particleVelocities[i * 4 + 1] = gridVelY * (1.0 - params.flipness) + flipVelY * params.flipness;
+                particleVelocities[i * 4 + 2] = gridVelZ * (1.0 - params.flipness) + flipVelZ * params.flipness;
+            }
+            
+            // Step 9: Calculate and apply particle-particle interaction forces (SPH-like)
+            calculateParticleInteractionForces();
+            
+            // Step 10: Advect particles and handle collisions
+            advectParticles(deltaTime);
+            
+            // Update the visualization
+            updateParticleVisualization();
+
+            // TEMPORARY FIX!!!!!! Update to slow particles to a halt when moving very slowly
+            updateVelocityDampingForCalm();
+            applyExtraDamping();
+            stabilizeFluid();
+            
+            // Helper function to compute divergence
+            function computeDivergence(velocityGrid, divergenceGrid, markerGrid) {
+                for (let x = 1; x < gridResX - 1; x++) {
+                    for (let y = 1; y < gridResY - 1; y++) {
+                        for (let z = 1; z < gridResZ - 1; z++) {
+                            const idx = getGridIndex(x, y, z);
+                            
+                            // Only compute divergence for fluid cells
+                            if (markerGrid[idx] !== 1) continue;
+                            
+                            // Get surrounding velocities
+                            const vxLeft = velocityGrid[getGridIndex(x-1, y, z) * 3];
+                            const vxRight = velocityGrid[getGridIndex(x+1, y, z) * 3];
+                            const vyBottom = velocityGrid[getGridIndex(x, y-1, z) * 3 + 1];
+                            const vyTop = velocityGrid[getGridIndex(x, y+1, z) * 3 + 1];
+                            const vzBack = velocityGrid[getGridIndex(x, y, z-1) * 3 + 2];
+                            const vzFront = velocityGrid[getGridIndex(x, y, z+1) * 3 + 2];
+                            
+                            // Calculate divergence as sum of velocity differences
+                            // (outflow - inflow) for each direction
+                            const divergence = (vxRight - vxLeft + 
+                                            vyTop - vyBottom + 
+                                            vzFront - vzBack) * 0.5;
+                            
+                            divergenceGrid[idx] = divergence;
+                        }
+                    }
+                }
+            }
+            
+            // Helper function to solve pressure using Jacobi iteration
+            function solvePressure(pressureGrid, tempPressureGrid, divergenceGrid, markerGrid) {
+                // Parameters for pressure solve
+                const iterations = 25; // Number of Jacobi iterations (more = more accurate)
+                const relaxation = 1.9; // Over-relaxation parameter (can speed up convergence)
+                
+                // Set initial pressure to zero
+                for (let i = 0; i < pressureGrid.length; i++) {
+                    pressureGrid[i] = 0;
+                }
+                
+                // Iteratively solve the pressure Poisson equation
+                for (let iter = 0; iter < iterations; iter++) {
+                    // Swap pressure grids for this iteration
+                    const sourceGrid = iter % 2 === 0 ? pressureGrid : tempPressureGrid;
+                    const targetGrid = iter % 2 === 0 ? tempPressureGrid : pressureGrid;
+                    
+                    for (let x = 1; x < gridResX - 1; x++) {
+                        for (let y = 1; y < gridResY - 1; y++) {
+                            for (let z = 1; z < gridResZ - 1; z++) {
+                                const idx = getGridIndex(x, y, z);
+                                
+                                // Only solve for fluid cells
+                                if (markerGrid[idx] !== 1) {
+                                    targetGrid[idx] = 0;
+                                    continue;
+                                }
+                                
+                                // Get neighboring pressures
+                                // Check if neighbors are fluid cells
+                                const idxLeft = getGridIndex(x-1, y, z);
+                                const idxRight = getGridIndex(x+1, y, z);
+                                const idxBottom = getGridIndex(x, y-1, z);
+                                const idxTop = getGridIndex(x, y+1, z);
+                                const idxBack = getGridIndex(x, y, z-1);
+                                const idxFront = getGridIndex(x, y, z+1);
+                                
+                                const isLeftFluid = markerGrid[idxLeft] === 1;
+                                const isRightFluid = markerGrid[idxRight] === 1;
+                                const isBottomFluid = markerGrid[idxBottom] === 1;
+                                const isTopFluid = markerGrid[idxTop] === 1;
+                                const isBackFluid = markerGrid[idxBack] === 1;
+                                const isFrontFluid = markerGrid[idxFront] === 1;
+                                
+                                // Count the number of fluid neighbors
+                                const fluidNeighbors = isLeftFluid + isRightFluid + 
+                                                    isBottomFluid + isTopFluid + 
+                                                    isBackFluid + isFrontFluid;
+                                
+                                if (fluidNeighbors === 0) {
+                                    targetGrid[idx] = 0;
+                                    continue;
+                                }
+                                
+                                // Get pressures, using zero for non-fluid neighbors
+                                const pLeft = isLeftFluid ? sourceGrid[idxLeft] : 0;
+                                const pRight = isRightFluid ? sourceGrid[idxRight] : 0;
+                                const pBottom = isBottomFluid ? sourceGrid[idxBottom] : 0;
+                                const pTop = isTopFluid ? sourceGrid[idxTop] : 0;
+                                const pBack = isBackFluid ? sourceGrid[idxBack] : 0;
+                                const pFront = isFrontFluid ? sourceGrid[idxFront] : 0;
+                                
+                                // Jacobi iteration formula
+                                const b = divergenceGrid[idx];
+                                const newPressure = (pLeft + pRight + pBottom + pTop + pBack + pFront - b) / fluidNeighbors;
+                                
+                                // Apply over-relaxation for faster convergence
+                                targetGrid[idx] = (1 - relaxation) * sourceGrid[idx] + relaxation * newPressure;
+                            }
+                        }
+                    }
+                }
+                
+                // Make sure final result is in pressureGrid
+                if (iterations % 2 === 0) {
+                    // Copy from tempPressureGrid to pressureGrid
+                    for (let i = 0; i < pressureGrid.length; i++) {
+                        pressureGrid[i] = tempPressureGrid[i];
+                    }
+                }
+            }
+            
+            // Project velocities to be divergence-free
+            function projectVelocity(velocityGrid, pressureGrid, markerGrid) {
+                for (let x = 1; x < gridResX - 1; x++) {
+                    for (let y = 1; y < gridResY - 1; y++) {
+                        for (let z = 1; z < gridResZ - 1; z++) {
+                            const idx = getGridIndex(x, y, z);
+                            
+                            // Only project fluid cells
+                            if (markerGrid[idx] !== 1) continue;
+                            
+                            // Compute pressure gradient
+                            const idxLeft = getGridIndex(x-1, y, z);
+                            const idxRight = getGridIndex(x+1, y, z);
+                            const idxBottom = getGridIndex(x, y-1, z);
+                            const idxTop = getGridIndex(x, y+1, z);
+                            const idxBack = getGridIndex(x, y, z-1);
+                            const idxFront = getGridIndex(x, y, z+1);
+                            
+                            // Get pressures using zero for boundary conditions
+                            const pCenter = pressureGrid[idx];
+                            const pLeft = x > 0 ? pressureGrid[idxLeft] : 0;
+                            const pRight = x < gridResX - 1 ? pressureGrid[idxRight] : 0;
+                            const pBottom = y > 0 ? pressureGrid[idxBottom] : 0;
+                            const pTop = y < gridResY - 1 ? pressureGrid[idxTop] : 0;
+                            const pBack = z > 0 ? pressureGrid[idxBack] : 0;
+                            const pFront = z < gridResZ - 1 ? pressureGrid[idxFront] : 0;
+                            
+                            // Compute pressure gradient
+                            const gradX = (pRight - pLeft) * 0.5;
+                            const gradY = (pTop - pBottom) * 0.5;
+                            const gradZ = (pFront - pBack) * 0.5;
+                            
+                            // Project velocity by subtracting the gradient
+                            velocityGrid[idx * 3] -= gradX;
+                            velocityGrid[idx * 3 + 1] -= gradY;
+                            velocityGrid[idx * 3 + 2] -= gradZ;
+                        }
+                    }
+                }
+            }
+            
+            // Apply viscosity diffusion to velocity field
+            function applyViscosity(velocityGrid, markerGrid) {
+                // Copy velocityGrid to a temporary array
+                const tempVelocityGrid = velocityGrid.slice();
+                
+                // Viscosity coefficient (higher = more viscous)
+                const viscosity = 0.1;
+                
+                for (let x = 1; x < gridResX - 1; x++) {
+                    for (let y = 1; y < gridResY - 1; y++) {
+                        for (let z = 1; z < gridResZ - 1; z++) {
+                            const idx = getGridIndex(x, y, z);
+                            
+                            // Only apply viscosity to fluid cells
+                            if (markerGrid[idx] !== 1) continue;
+                            
+                            // Get indices of neighboring cells
+                            const idxLeft = getGridIndex(x-1, y, z);
+                            const idxRight = getGridIndex(x+1, y, z);
+                            const idxBottom = getGridIndex(x, y-1, z);
+                            const idxTop = getGridIndex(x, y+1, z);
+                            const idxBack = getGridIndex(x, y, z-1);
+                            const idxFront = getGridIndex(x, y, z+1);
+                            
+                            // Compute Laplacian of velocity (used for viscosity diffusion)
+                            // For each component of velocity
+                            for (let component = 0; component < 3; component++) {
+                                const vCenter = velocityGrid[idx * 3 + component];
+                                const vLeft = velocityGrid[idxLeft * 3 + component];
+                                const vRight = velocityGrid[idxRight * 3 + component];
+                                const vBottom = velocityGrid[idxBottom * 3 + component];
+                                const vTop = velocityGrid[idxTop * 3 + component];
+                                const vBack = velocityGrid[idxBack * 3 + component];
+                                const vFront = velocityGrid[idxFront * 3 + component];
+                                
+                                // Simple discretization of the Laplacian
+                                const laplacian = (vLeft + vRight + vBottom + vTop + vBack + vFront - 6 * vCenter);
+                                
+                                // Apply viscous diffusion
+                                tempVelocityGrid[idx * 3 + component] += viscosity * laplacian * deltaTime;
+                            }
+                        }
+                    }
+                }
+                
+                // Update velocityGrid with diffused values
+                for (let i = 0; i < velocityGrid.length; i++) {
+                    velocityGrid[i] = tempVelocityGrid[i];
+                }
+            }
+            
+            // Calculate particle-particle interaction forces
+            function calculateParticleInteractionForces() {
+                // Array to store forces for each particle
+                const particleForces = new Float32Array(params.particleCount * 3);
+                
+                // Loop through particles to compute interaction forces
+                for (let i = 0; i < params.particleCount; i++) {
+                    const px = particlePositions[i * 4];
+                    const py = particlePositions[i * 4 + 1];
+                    const pz = particlePositions[i * 4 + 2];
+                    
+                    // Get particles in neighboring cells
+                    const neighbors = [];
+                    const key = getHashKey(px, py, pz);
+                    const cellX = Math.floor(px / spatialHashCellSize);
+                    const cellY = Math.floor(py / spatialHashCellSize);
+                    const cellZ = Math.floor(pz / spatialHashCellSize);
+                    
+                    // Check 27 neighboring cells
+                    for (let nx = -1; nx <= 1; nx++) {
+                        for (let ny = -1; ny <= 1; ny++) {
+                            for (let nz = -1; nz <= 1; nz++) {
+                                const neighborKey = `${cellX + nx},${cellY + ny},${cellZ + nz}`;
+                                if (spatialHash[neighborKey]) {
+                                    neighbors.push(...spatialHash[neighborKey]);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Calculate forces with neighbors using SPH principles
+                    for (let j = 0; j < neighbors.length; j++) {
+                        const neighborIdx = neighbors[j];
+                        if (i === neighborIdx) continue;
+                        
+                        const nx = particlePositions[neighborIdx * 4];
+                        const ny = particlePositions[neighborIdx * 4 + 1];
+                        const nz = particlePositions[neighborIdx * 4 + 2];
+                        
+                        // Vector from particle i to j
+                        const dx = nx - px;
+                        const dy = ny - py;
+                        const dz = nz - pz;
+                        
+                        // Distance between particles
+                        const distSquared = dx*dx + dy*dy + dz*dz;
+                        
+                        // Only consider particles within interaction radius
+                        const interactionRadius = params.interactionRadius;
+                        if (distSquared < interactionRadius * interactionRadius && distSquared > 0.0001) {
+                            const dist = Math.sqrt(distSquared);
+                            
+                            // Normalized direction
+                            const dirX = dx / dist;
+                            const dirY = dy / dist;
+                            const dirZ = dz / dist;
+                            
+                            // === IMPROVED PRESSURE FORCE ===
+                            // Using poly6 kernel for smoother pressure gradient
+                            const q = dist / interactionRadius;
+                            const pressureKernel = Math.pow(1 - q, 4) * (4 * q + 1);
+                            const pressureStrength = 15.0; // Increased pressure strength
+                            const pressureForce = pressureStrength * pressureKernel;
+                            
+                            // === ENHANCED VISCOSITY FORCE ===
+                            // Use relative velocity for viscosity
+                            const relVelX = particleVelocities[neighborIdx * 4] - particleVelocities[i * 4];
+                            const relVelY = particleVelocities[neighborIdx * 4 + 1] - particleVelocities[i * 4 + 1];
+                            const relVelZ = particleVelocities[neighborIdx * 4 + 2] - particleVelocities[i * 4 + 2];
+                            
+                            // Apply viscosity to all velocity components, not just along the connecting line
+                            // This helps particles settle faster by damping all motion
+                            const viscosityStrength = 1.5; // Increased viscosity
+                            const viscosityKernel = Math.pow(1 - q, 2);
+                            const viscosityForceX = viscosityStrength * viscosityKernel * relVelX;
+                            const viscosityForceY = viscosityStrength * viscosityKernel * relVelY;
+                            const viscosityForceZ = viscosityStrength * viscosityKernel * relVelZ;
+                            
+                            // === IMPROVED COHESION FORCE ===
+                            // Creates surface tension, modified for better water-like behavior
+                            const cohesionKernel = q > 0.2 && q < 0.8 ? 
+                                Math.pow(1 - q, 3) : 0;
+                            const cohesionStrength = 0.8;
+                            const cohesionForce = -cohesionStrength * cohesionKernel;
+                            
+                            // Combine all forces
+                            // Pressure forces along the direction vector
+                            particleForces[i * 3] += dirX * pressureForce;
+                            particleForces[i * 3 + 1] += dirY * pressureForce;
+                            particleForces[i * 3 + 2] += dirZ * pressureForce;
+                            
+                            // Viscosity forces directly affect velocity components
+                            particleForces[i * 3] -= viscosityForceX;
+                            particleForces[i * 3 + 1] -= viscosityForceY;
+                            particleForces[i * 3 + 2] -= viscosityForceZ;
+                            
+                            // Cohesion forces along the direction vector
+                            particleForces[i * 3] += dirX * cohesionForce;
+                            particleForces[i * 3 + 1] += dirY * cohesionForce;
+                            particleForces[i * 3 + 2] += dirZ * cohesionForce;
+                        }
+                    }
+                }
+                
+                // Apply forces to velocities with velocity damping for settling
+                for (let i = 0; i < params.particleCount; i++) {
+                    // Get current velocity magnitude
+                    const vx = particleVelocities[i * 4];
+                    const vy = particleVelocities[i * 4 + 1];
+                    const vz = particleVelocities[i * 4 + 2];
+                    const velMagSquared = vx*vx + vy*vy + vz*vz;
+                    
+                    // Apply global damping (higher than before)
+                    const globalDamping = 0.95; // 2% velocity reduction per step
+                    
+                    // Apply additional damping when velocity is low to help settling
+                    const settlingThreshold = 0.5;
+                    let totalDamping = globalDamping;
+                    
+                    if (velMagSquared < settlingThreshold * settlingThreshold) {
+                        // Stronger damping for low velocities
+                        const settlingDamping = 0.8; // 10% additional reduction for slow particles
+                        totalDamping *= settlingDamping;
+                    }
+                    
+                    // Apply forces with semi-implicit Euler integration
+                    particleVelocities[i * 4] = (vx + particleForces[i * 3] * deltaTime) * totalDamping;
+                    particleVelocities[i * 4 + 1] = (vy + particleForces[i * 3 + 1] * deltaTime) * totalDamping;
+                    particleVelocities[i * 4 + 2] = (vz + particleForces[i * 3 + 2] * deltaTime) * totalDamping;
+                    
+                    // Apply velocity clamping for stability
+                    const maxVelocity = 10.0; // Reduced maximum velocity
+                    const velMagSquaredNew = 
+                        particleVelocities[i * 4] * particleVelocities[i * 4] +
+                        particleVelocities[i * 4 + 1] * particleVelocities[i * 4 + 1] +
+                        particleVelocities[i * 4 + 2] * particleVelocities[i * 4 + 2];
+                    
+                    if (velMagSquaredNew > maxVelocity * maxVelocity) {
+                        const velMag = Math.sqrt(velMagSquaredNew);
+                        const scale = maxVelocity / velMag;
+                        particleVelocities[i * 4] *= scale;
+                        particleVelocities[i * 4 + 1] *= scale;
+                        particleVelocities[i * 4 + 2] *= scale;
+                    }
+                    
+                    // Improved settling: stop very slow particles completely
+                    const stoppingThreshold = 0.01;
+                    if (velMagSquaredNew < stoppingThreshold * stoppingThreshold) {
+                        particleVelocities[i * 4] *= 0.8; // Let them slowly come to a complete stop
+                        particleVelocities[i * 4 + 1] *= 0.8;
+                        particleVelocities[i * 4 + 2] *= 0.8;
+                    }
+                }
+            }
+            
+            // Advect particles and handle collisions
+            function advectParticles(deltaTime) {
+                // Sub-stepping for more stable collisions and smoother motion
+                const numSubsteps = 4; // Increased from 2 to 4 substeps
+                const subDeltaTime = deltaTime / numSubsteps;
+                
+                for (let step = 0; step < numSubsteps; step++) {
+                    for (let i = 0; i < params.particleCount; i++) {
+                        // Get current position and velocity
+                        const px = particlePositions[i * 4];
+                        const py = particlePositions[i * 4 + 1];
+                        const pz = particlePositions[i * 4 + 2];
+                        
+                        const vx = particleVelocities[i * 4];
+                        const vy = particleVelocities[i * 4 + 1];
+                        const vz = particleVelocities[i * 4 + 2];
+                        
+                        // Update position using semi-implicit Euler with added damping
+                        particlePositions[i * 4] += vx * subDeltaTime;
+                        particlePositions[i * 4 + 1] += vy * subDeltaTime;
+                        particlePositions[i * 4 + 2] += vz * subDeltaTime;
+                        
+                        // Check for collision with loaded model
+                        checkParticleModelCollision(i);
+                        
+                        // Check and resolve particle-particle collisions
+                        resolveParticleCollisions(i);
+                        
+                        // Enforce boundary conditions
+                        enforceParticleBoundaries(i);
+                    }
+                    
+                    // Re-build spatial hash after each substep for accurate collision detection
+                    if (step < numSubsteps - 1) {
+                        // Only rebuild hash if we have more substeps to go
+                        rebuildSpatialHash();
+                    }
+                }
+            }
+
+            // Rebuild spatial hash for particle-particle interaction
+            function rebuildSpatialHash() {
+                // Clear the spatial hash
+                const spatialHash = {};
+                
+                // Function to get spatial hash index for particle-particle interaction
+                const particleRadius = params.particleRadius;
+                const spatialHashCellSize = particleRadius * 2.5;
+                
+                function getHashKey(x, y, z) {
+                    const cellX = Math.floor(x / spatialHashCellSize);
+                    const cellY = Math.floor(y / spatialHashCellSize);
+                    const cellZ = Math.floor(z / spatialHashCellSize);
+                    return `${cellX},${cellY},${cellZ}`;
+                }
+                
+                // Rebuild spatial hash for particle-particle interaction
+                for (let i = 0; i < params.particleCount; i++) {
+                    const x = particlePositions[i * 4];
+                    const y = particlePositions[i * 4 + 1];
+                    const z = particlePositions[i * 4 + 2];
+                    
+                    const key = getHashKey(x, y, z);
+                    if (!spatialHash[key]) {
+                        spatialHash[key] = [];
+                    }
+                    spatialHash[key].push(i);
+                }
+                
+                return spatialHash;
+            }
+            
+            // Resolve collisions between particles
+            function resolveParticleCollisions(particleIndex) {
+                const px = particlePositions[particleIndex * 4];
+                const py = particlePositions[particleIndex * 4 + 1];
+                const pz = particlePositions[particleIndex * 4 + 2];
+                
+                // Get particles in neighboring cells
+                const cellX = Math.floor(px / spatialHashCellSize);
+                const cellY = Math.floor(py / spatialHashCellSize);
+                const cellZ = Math.floor(pz / spatialHashCellSize);
+                
+                // Collision parameters
+                const minDist = params.particleRadius * 2.0; // Full diameter to prevent overlap
+                const minDistSquared = minDist * minDist;
+                
+                // Check only immediate neighbors for collision
+                for (let nx = -1; nx <= 1; nx++) {
+                    for (let ny = -1; ny <= 1; ny++) {
+                        for (let nz = -1; nz <= 1; nz++) {
+                            const neighborKey = `${cellX + nx},${cellY + ny},${cellZ + nz}`;
+                            if (!spatialHash[neighborKey]) continue;
+                            
+                            // Check neighbors in this cell
+                            const neighbors = spatialHash[neighborKey];
+                            for (let j = 0; j < neighbors.length; j++) {
+                                const neighborIdx = neighbors[j];
+                                if (particleIndex === neighborIdx) continue;
+                                
+                                const nx = particlePositions[neighborIdx * 4];
+                                const ny = particlePositions[neighborIdx * 4 + 1];
+                                const nz = particlePositions[neighborIdx * 4 + 2];
+                                
+                                // Vector from particle to neighbor
+                                const dx = nx - px;
+                                const dy = ny - py;
+                                const dz = nz - pz;
+                                
+                                // Squared distance
+                                const distSquared = dx*dx + dy*dy + dz*dz;
+                                
+                                // Check if particles are overlapping
+                                if (distSquared < minDistSquared && distSquared > 0.0001) {
+                                    const dist = Math.sqrt(distSquared);
+                                    const penetration = minDist - dist;
+                                    
+                                    // Normalized direction
+                                    const dirX = dx / dist;
+                                    const dirY = dy / dist;
+                                    const dirZ = dz / dist;
+                                    
+                                    // Position correction (stronger for more overlap)
+                                    const positionCorrection = penetration * 0.5; // Half the correction per particle
+                                    
+                                    // Move particles apart with stronger separation
+                                    particlePositions[particleIndex * 4] -= dirX * positionCorrection * 1.05;
+                                    particlePositions[particleIndex * 4 + 1] -= dirY * positionCorrection * 1.05;
+                                    particlePositions[particleIndex * 4 + 2] -= dirZ * positionCorrection * 1.05;
+                                    
+                                    // Apply velocity correction with improved damping
+                                    const v1x = particleVelocities[particleIndex * 4];
+                                    const v1y = particleVelocities[particleIndex * 4 + 1];
+                                    const v1z = particleVelocities[particleIndex * 4 + 2];
+                                    
+                                    const v2x = particleVelocities[neighborIdx * 4];
+                                    const v2y = particleVelocities[neighborIdx * 4 + 1];
+                                    const v2z = particleVelocities[neighborIdx * 4 + 2];
+                                    
+                                    // Relative velocity
+                                    const rvx = v2x - v1x;
+                                    const rvy = v2y - v1y;
+                                    const rvz = v2z - v1z;
+                                    
+                                    // Relative velocity along normal
+                                    const velAlongNormal = rvx * dirX + rvy * dirY + rvz * dirZ;
+                                    
+                                    // Only process collision if particles are approaching
+                                    if (velAlongNormal < 0) {
+                                        // Use a much lower coefficient of restitution for water-like behavior
+                                        const e = params.restitution; // Low bounce
+                                        const j = -(1.0 + e) * velAlongNormal * 0.5;
+                                        
+                                        // Apply impulse with increased damping on lateral motion
+                                        particleVelocities[particleIndex * 4] -= dirX * j;
+                                        particleVelocities[particleIndex * 4 + 1] -= dirY * j;
+                                        particleVelocities[particleIndex * 4 + 2] -= dirZ * j;
+                                        
+                                        // Add friction-like effect to reduce lateral motion
+                                        // First, calculate the tangential component of relative velocity
+                                        const tangentialX = rvx - velAlongNormal * dirX;
+                                        const tangentialY = rvy - velAlongNormal * dirY;
+                                        const tangentialZ = rvz - velAlongNormal * dirZ;
+                                        
+                                        // Apply friction (reduces lateral sliding between particles)
+                                        const friction = 0.3; // Friction coefficient
+                                        particleVelocities[particleIndex * 4] -= tangentialX * friction;
+                                        particleVelocities[particleIndex * 4 + 1] -= tangentialY * friction;
+                                        particleVelocities[particleIndex * 4 + 2] -= tangentialZ * friction;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Update visualization (THREE.js buffer geometry)
+            function updateParticleVisualization() {
+                for (let i = 0; i < params.particleCount; i++) {
+                    particleSystem.geometry.attributes.position.array[i * 3] = particlePositions[i * 4];
+                    particleSystem.geometry.attributes.position.array[i * 3 + 1] = particlePositions[i * 4 + 1];
+                    particleSystem.geometry.attributes.position.array[i * 3 + 2] = particlePositions[i * 4 + 2];
+                }
+                
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+            }
+        }
+        
+
+        // Helper function to enforce grid boundary conditions for MAC (staggered) grid
+        function enforceBoundariesMACGrid(velocityGrid, markerGrid) {
+            const gridResX = params.gridResolutionX;
+            const gridResY = params.gridResolutionY;
+            const gridResZ = params.gridResolutionZ;
+            
+            // Function to get grid cell index
+            function getGridIndex(x, y, z) {
+                return (z * gridResY * gridResX) + (y * gridResX) + x;
+            }
+            
+            // Enforce boundaries for each cell
+            for (let x = 0; x < gridResX; x++) {
+                for (let y = 0; y < gridResY; y++) {
+                    for (let z = 0; z < gridResZ; z++) {
+                        const idx = getGridIndex(x, y, z);
+                        
+                        // Left/right boundaries
+                        if (x === 0) {
+                            velocityGrid[idx * 3] = Math.max(0, velocityGrid[idx * 3]); // No flow through left boundary
+                        } else if (x === gridResX - 1) {
+                            velocityGrid[idx * 3] = Math.min(0, velocityGrid[idx * 3]); // No flow through right boundary
+                        }
+                        
+                        // Bottom/top boundaries
+                        if (y === 0) {
+                            velocityGrid[idx * 3 + 1] = Math.max(0, velocityGrid[idx * 3 + 1]); // No flow through bottom
+                        } else if (y === gridResY - 1) {
+                            velocityGrid[idx * 3 + 1] = Math.min(0, velocityGrid[idx * 3 + 1]); // No flow through top
+                        }
+                        
+                        // Front/back boundaries
+                        if (z === 0) {
+                            velocityGrid[idx * 3 + 2] = Math.max(0, velocityGrid[idx * 3 + 2]); // No flow through front
+                        } else if (z === gridResZ - 1) {
+                            velocityGrid[idx * 3 + 2] = Math.min(0, velocityGrid[idx * 3 + 2]); // No flow through back
+                        }
+                    }
+                }
+            }
+        }
+
+        //  Helper function to properly change particle count with deletion.
+        function updateParticleCount(oldCount, newCount) {
+            // Calculate particles dimensions based on count
+            const aspectRatio = 1;
+            params.particlesWidth = Math.ceil(Math.sqrt(newCount * aspectRatio));
+            params.particlesHeight = Math.ceil(newCount / params.particlesWidth);
+            
+            if (newCount < oldCount) {
+                // If reducing particles, hide excess particles by moving them far away
+                for (let i = newCount; i < oldCount; i++) {
+                    // Move particles far outside the visible area
+                    particlePositions[i * 4] = 9999;
+                    particlePositions[i * 4 + 1] = 9999;
+                    particlePositions[i * 4 + 2] = 9999;
+                    
+                    // Zero out their velocities
+                    particleVelocities[i * 4] = 0;
+                    particleVelocities[i * 4 + 1] = 0;
+                    particleVelocities[i * 4 + 2] = 0;
+                    
+                    // Update the visualization
+                    particleSystem.geometry.attributes.position.array[i * 3] = 9999;
+                    particleSystem.geometry.attributes.position.array[i * 3 + 1] = 9999;
+                    particleSystem.geometry.attributes.position.array[i * 3 + 2] = 9999;
+                }
+            } else if (newCount > oldCount) {
+                // If increasing particles, initialize new particles in a sensible way
+                initializeNewParticles(oldCount, newCount);
+            }
+            
+            // Update the THREE.js buffer
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Helper to initialize new particles when increasing count
+        function initializeNewParticles(startIndex, endIndex) {
+            // Place new particles in a grid at the top of the container
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            const particleSpacing = params.particleRadius * 2.2;
+            const particlesPerRow = Math.ceil(Math.sqrt(endIndex - startIndex));
+            
+            let idx = 0;
+            for (let i = startIndex; i < endIndex; i++) {
+                // Calculate grid position for new particles at the top of the container
+                const row = Math.floor(idx / particlesPerRow);
+                const col = idx % particlesPerRow;
+                
+                // Place particles in a flat layer at the top
+                particlePositions[i * 4] = -halfWidth + 2 + (col * particleSpacing);
+                particlePositions[i * 4 + 1] = halfHeight - 2; // Near the top
+                particlePositions[i * 4 + 2] = -halfDepth + 2 + (row * particleSpacing);
+                
+                // Small initial velocity downward
+                particleVelocities[i * 4] = (Math.random() - 0.5) * 0.1;
+                particleVelocities[i * 4 + 1] = -0.5 - Math.random() * 0.5;
+                particleVelocities[i * 4 + 2] = (Math.random() - 0.5) * 0.1;
+                
+                // Update the visualization
+                particleSystem.geometry.attributes.position.array[i * 3] = particlePositions[i * 4];
+                particleSystem.geometry.attributes.position.array[i * 3 + 1] = particlePositions[i * 4 + 1];
+                particleSystem.geometry.attributes.position.array[i * 3 + 2] = particlePositions[i * 4 + 2];
+                
+                idx++;
+            }
+        }
+
+        // Helper function to enforce particle boundary conditions
+        function enforceParticleBoundaries(particleIndex) {
+            const halfWidth = params.gridWidth / 2;
+            const halfHeight = params.gridHeight / 2;
+            const halfDepth = params.gridDepth / 2;
+            
+            const px = particlePositions[particleIndex * 4];
+            const py = particlePositions[particleIndex * 4 + 1];
+            const pz = particlePositions[particleIndex * 4 + 2];
+            
+            const vx = particleVelocities[particleIndex * 4];
+            const vy = particleVelocities[particleIndex * 4 + 1];
+            const vz = particleVelocities[particleIndex * 4 + 2];
+            
+            // Use lower damping and add minimum distance from wall to prevent sticking
+            const damping = 0.2; // Lower value = less energy loss on collision
+            const particleRadius = params.particleRadius;
+            const wallOffset = particleRadius * 1.02; // Slight offset to prevent wall sticking
+            
+            let modified = false;
+            
+            // Check X boundaries with anti-sticking measures
+            if (px - particleRadius < -halfWidth) {
+                particlePositions[particleIndex * 4] = -halfWidth + wallOffset;
+                // Only reflect velocity if moving toward the wall
+                if (vx < 0) {
+                    particleVelocities[particleIndex * 4] = Math.abs(vx) * (1 - damping);
+                    // Add small outward push
+                    particleVelocities[particleIndex * 4] += 0.1;
+                }
+                modified = true;
+            } else if (px + particleRadius > halfWidth) {
+                particlePositions[particleIndex * 4] = halfWidth - wallOffset;
+                if (vx > 0) {
+                    particleVelocities[particleIndex * 4] = -Math.abs(vx) * (1 - damping);
+                    particleVelocities[particleIndex * 4] -= 0.1;
+                }
+                modified = true;
+            }
+            
+            // Check Y boundaries
+            if (py - particleRadius < -halfHeight) {
+                particlePositions[particleIndex * 4 + 1] = -halfHeight + wallOffset;
+                if (vy < 0) {
+                    particleVelocities[particleIndex * 4 + 1] = Math.abs(vy) * (1 - damping);
+                    particleVelocities[particleIndex * 4 + 1] += 0.1;
+                }
+                modified = true;
+            } else if (py + particleRadius > halfHeight) {
+                particlePositions[particleIndex * 4 + 1] = halfHeight - wallOffset;
+                if (vy > 0) {
+                    particleVelocities[particleIndex * 4 + 1] = -Math.abs(vy) * (1 - damping);
+                    particleVelocities[particleIndex * 4 + 1] -= 0.1;
+                }
+                modified = true;
+            }
+            
+            // Check Z boundaries
+            if (pz - particleRadius < -halfDepth) {
+                particlePositions[particleIndex * 4 + 2] = -halfDepth + wallOffset;
+                if (vz < 0) {
+                    particleVelocities[particleIndex * 4 + 2] = Math.abs(vz) * (1 - damping);
+                    particleVelocities[particleIndex * 4 + 2] += 0.1;
+                }
+                modified = true;
+            } else if (pz + particleRadius > halfDepth) {
+                particlePositions[particleIndex * 4 + 2] = halfDepth - wallOffset;
+                if (vz > 0) {
+                    particleVelocities[particleIndex * 4 + 2] = -Math.abs(vz) * (1 - damping);
+                    particleVelocities[particleIndex * 4 + 2] -= 0.1;
+                }
+                modified = true;
+            }
+    
+    // If the particle was modified (near a wall), apply additional damping
+    // This helps particles settle faster when near walls
+    if (modified) {
+        const extraDamping = 0.95; // 5% velocity reduction near walls
+        particleVelocities[particleIndex * 4] *= extraDamping;
+        particleVelocities[particleIndex * 4 + 1] *= extraDamping;
+        particleVelocities[particleIndex * 4 + 2] *= extraDamping;
+    }
+}
+        // Improved particle-model collision detection
+        function checkParticleModelCollision(particleIndex) {
+            if (!loadedModel || modelMeshes.length === 0) return;
+            
+            const px = particlePositions[particleIndex * 4];
+            const py = particlePositions[particleIndex * 4 + 1];
+            const pz = particlePositions[particleIndex * 4 + 2];
+            
+            // Quick check against model bounding box
+            const modelPosition = loadedModel.position;
+            const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+            
+            // Add padding for particle radius
+            const particleRadius = params.sphereRadius * 0.8;
+            boundingBox.expandByScalar(particleRadius);
+            
+            const particlePoint = new THREE.Vector3(px, py, pz);
+            
+            // If particle is within expanded bounding box
+            if (boundingBox.containsPoint(particlePoint)) {
+                // More detailed collision check
+                for (let i = 0; i < modelMeshes.length; i++) {
+                    const meshBox = modelMeshes[i].boundingBox.clone();
+                    meshBox.expandByScalar(particleRadius);
+                    
+                    if (meshBox.containsPoint(particlePoint)) {
+                        // Calculate penetration vector
+                        const meshCenter = new THREE.Vector3();
+                        meshBox.getCenter(meshCenter);
+                        
+                        // Calculate normal from mesh center to particle
+                        const normal = new THREE.Vector3(
+                            particlePoint.x - meshCenter.x,
+                            particlePoint.y - meshCenter.y,
+                            particlePoint.z - meshCenter.z
+                        ).normalize();
+                        
+                        // Apply impulse to model
+                        const velocityMagnitude = Math.sqrt(
+                            particleVelocities[particleIndex * 4] * particleVelocities[particleIndex * 4] +
+                            particleVelocities[particleIndex * 4 + 1] * particleVelocities[particleIndex * 4 + 1] +
+                            particleVelocities[particleIndex * 4 + 2] * particleVelocities[particleIndex * 4 + 2]
+                        );
+                        
+                        // Apply impulse to model (scaled by particle velocity)
+                        if (velocityMagnitude > 0.1 && !loadedModel.userData.isDragging) {
+                            const impulseFactor = 0.002;
+                            loadedModel.userData.velocity.x += normal.x * velocityMagnitude * impulseFactor;
+                            loadedModel.userData.velocity.y += normal.y * velocityMagnitude * impulseFactor;
+                            loadedModel.userData.velocity.z += normal.z * velocityMagnitude * impulseFactor;
+                            
+                            // Add angular velocity for more interesting motion
+                            const distToCenter = new THREE.Vector3(
+                                particlePoint.x - modelPosition.x,
+                                particlePoint.y - modelPosition.y,
+                                particlePoint.z - modelPosition.z
+                            );
+                            
+                            // Calculate torque using cross product
+                            const torque = new THREE.Vector3().crossVectors(distToCenter, normal)
+                                .multiplyScalar(0.0003 * velocityMagnitude);
+                            
+                            loadedModel.userData.angularVelocity.add(torque);
+                        }
+                        
+                        // Reflect particle velocity
+                        const vx = particleVelocities[particleIndex * 4];
+                        const vy = particleVelocities[particleIndex * 4 + 1];
+                        const vz = particleVelocities[particleIndex * 4 + 2];
+                        
+                        const dot = vx * normal.x + vy * normal.y + vz * normal.z;
+                        
+                        // Only reflect if moving toward surface
+                        if (dot < 0) {
+                            const damping = 0.4; // Higher = less bounce
+                            
+                            // Reflect velocity with damping
+                            particleVelocities[particleIndex * 4] = (vx - 2 * dot * normal.x) * (1 - damping);
+                            particleVelocities[particleIndex * 4 + 1] = (vy - 2 * dot * normal.y) * (1 - damping);
+                            particleVelocities[particleIndex * 4 + 2] = (vz - 2 * dot * normal.z) * (1 - damping);
+                            
+                            // Move particle outside the collision (prevent sticking)
+                            particlePositions[particleIndex * 4] = px + normal.x * particleRadius * 1.01;
+                            particlePositions[particleIndex * 4 + 1] = py + normal.y * particleRadius * 1.01;
+                            particlePositions[particleIndex * 4 + 2] = pz + normal.z * particleRadius * 1.01;
+                        }
+                        
+                        return; // Only handle one collision per particle per frame
+                    }
+                }
+            }
+        }
+        
+        // Helper function to enforce grid boundary conditions
+        function enforceBoundaries(velocityGrid, weightGrid) {
+            const gridResX = params.gridResolutionX;
+            const gridResY = params.gridResolutionY;
+            const gridResZ = params.gridResolutionZ;
+            
+            // Function to get grid cell index
+            function getGridIndex(x, y, z) {
+                return (z * gridResY * gridResX) + (y * gridResX) + x;
+            }
+            
+            // Enforce boundaries for each cell
+            for (let x = 0; x < gridResX; x++) {
+                for (let y = 0; y < gridResY; y++) {
+                    for (let z = 0; z < gridResZ; z++) {
+                        const idx = getGridIndex(x, y, z);
+                        
+                        // Skip empty cells
+                        if (weightGrid[idx] < 0.0001) continue;
+                        
+                        // Left/right boundaries
+                        if (x === 0) {
+                            velocityGrid[idx * 3] = Math.max(0, velocityGrid[idx * 3]); // No flow through left boundary
+                        } else if (x === gridResX - 1) {
+                            velocityGrid[idx * 3] = Math.min(0, velocityGrid[idx * 3]); // No flow through right boundary
+                        }
+                        
+                        // Bottom/top boundaries
+                        if (y === 0) {
+                            velocityGrid[idx * 3 + 1] = Math.max(0, velocityGrid[idx * 3 + 1]); // No flow through bottom
+                        } else if (y === gridResY - 1) {
+                            velocityGrid[idx * 3 + 1] = Math.min(0, velocityGrid[idx * 3 + 1]); // No flow through top
+                        }
+                        
+                        // Front/back boundaries
+                        if (z === 0) {
+                            velocityGrid[idx * 3 + 2] = Math.max(0, velocityGrid[idx * 3 + 2]); // No flow through front
+                        } else if (z === gridResZ - 1) {
+                            velocityGrid[idx * 3 + 2] = Math.min(0, velocityGrid[idx * 3 + 2]); // No flow through back
+                        }
+                    }
+                }
+            }
+        }
+        
+        
+        
+        // Main animation loop
+        function animate(now) {
+            requestAnimationFrame(animate);
+            
+            // Update FPS counter
+            updateFPSCounter(now);
+            
+            // Update controls
+            if (controls) {
+                controls.update();
+            }
+            
+            // Get the time elapsed since the last frame with upper limit to avoid instability
+            // The time step clamping is critical for stable simulation
+            const deltaTime = Math.min(clock.getDelta(), 0.033) * params.timeScale;
+            
+            // Update object physics
+            updateObjectPhysics(deltaTime);
+            
+            if (!isSimulationPaused) {
+                // Update fluid simulation
+                updateSimulation(deltaTime);
+            }
+            
+            // Render
+            renderer.render(scene, camera);
+        }
+        
+        // Start the simulation when the page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
