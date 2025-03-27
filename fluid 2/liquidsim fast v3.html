@@ -1228,8 +1228,8 @@
                         const intensity = Math.min(speed * 2, 1);
                         
                         // Adjust color based on speed - more blue when still, more white when moving fast
-                        const r = 0.5 + intensity * 0.3;
-                        const g = 0.7 + intensity * 0.2;
+                        const r = .1 + intensity * 0.6;
+                        const g = 0.7 + intensity * 0.8;
                         const b = 0.9;
                         
                         particle.material.color.setRGB(r, g, b);
