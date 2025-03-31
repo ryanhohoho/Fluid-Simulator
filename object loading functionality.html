@@ -1,0 +1,456 @@
+// Create disintegrate button
+        function createDisintegrateButton() {
+            const disintegrateButton = document.createElement('button');
+            disintegrateButton.id = 'disintegrate-button';
+            disintegrateButton.className = 'disintegrate-button';
+            disintegrateButton.innerHTML = '<div class="progress-bar"></div><span>Disintegrate Object</span>';
+            disintegrateButton.style.display = 'none'; // Initially hidden
+            
+            // Add to document after the simulation controls
+            document.querySelector('.sim-controls').appendChild(disintegrateButton);
+            
+            // Disintegration variables
+            let disintegrateProgress = 0;
+            let isDisintegrating = false;
+            let disintegrateInterval = null;
+            const maxDisintegrateTime = 3000; // 3 seconds to disintegrate
+            
+            // Disintegrate button events
+            disintegrateButton.addEventListener('mousedown', function() {
+                if (!loadedModel) return;
+                
+                isDisintegrating = true;
+                disintegrateProgress = 0;
+                const progressBar = document.querySelector('.progress-bar');
+                
+                // Start progress
+                disintegrateInterval = setInterval(function() {
+                    disintegrateProgress += 10;
+                    const percent = Math.min(100, (disintegrateProgress / maxDisintegrateTime) * 100);
+                    progressBar.style.width = percent + '%';
+                    
+                    // Make the model glow
+                    if (loadedModel) {
+                        // Apply glow to all meshes
+                        loadedModel.traverse(function(child) {
+                            if (child instanceof THREE.Mesh) {
+                                // Increase emission/glow intensity
+                                if (!child.material.userData.originalColor) {
+                                    child.material.userData.originalColor = child.material.color.clone();
+                                }
+                                
+                                // Transition from original color to bright red/orange
+                                const glowIntensity = percent / 100;
+                                const color = new THREE.Color().lerpColors(
+                                    child.material.userData.originalColor,
+                                    new THREE.Color(1, 0.3, 0),
+                                    glowIntensity
+                                );
+                                
+                                child.material.color.copy(color);
+                                child.material.emissive = new THREE.Color(color.r * glowIntensity, 
+                                                                     color.g * glowIntensity * 0.3, 
+                                                                     0);
+                                
+                                // Make it more transparent when close to disintegration
+                                if (percent > 80) {
+                                    child.material.opacity = 1 - ((percent - 80) / 20);
+                                }
+                            }
+                        });
+                        
+                        // Add particle effects when close to disintegration
+                        if (percent > 80) {
+                            const particleCount = Math.floor((percent - 80) / 5);
+                            spawnDisintegrationParticles(particleCount);
+                        }
+                    }
+                    
+                    // Check if disintegration is complete
+                    if (disintegrateProgress >= maxDisintegrateTime) {
+                        clearInterval(disintegrateInterval);
+                        disintegrateInterval = null;
+                        isDisintegrating = false;
+                        
+                        // Disintegrate the model with explosion
+                        if (loadedModel) {
+                            // Create explosion effect
+                            createExplosionEffect(loadedModel);
+                            
+                            // Then remove the model
+                            scene.remove(loadedModel);
+                            loadedModel = null;
+                            modelMeshes = [];
+                            progressBar.style.width = '0%';
+                            disintegrateButton.style.display = 'none';
+                        }
+                    }
+                }, 10);
+            });
+            
+            // Cancel disintegration when mouse is released
+            disintegrateButton.addEventListener('mouseup', cancelDisintegration);
+            disintegrateButton.addEventListener('mouseleave', cancelDisintegration);
+            
+            function cancelDisintegration() {
+                if (!isDisintegrating) return;
+                
+                isDisintegrating = false;
+                clearInterval(disintegrateInterval);
+                const progressBar = document.querySelector('.progress-bar');
+                
+                // Animate the progress bar back to 0
+                const initialProgress = disintegrateProgress;
+                const reverseStartTime = Date.now();
+                const reverseDuration = 1000; // 1 second to reverse
+                
+                const reverseProgress = setInterval(function() {
+                    const elapsed = Date.now() - reverseStartTime;
+                    const t = Math.min(1, elapsed / reverseDuration);
+                    
+                    // Easing function for smooth reversal
+                    const easeOut = 1 - Math.pow(1 - t, 2);
+                    
+                    disintegrateProgress = initialProgress * (1 - easeOut);
+                    
+                    if (disintegrateProgress <= 0 || t >= 1) {
+                        disintegrateProgress = 0;
+                        clearInterval(reverseProgress);
+                        progressBar.style.width = '0%';
+                        
+                        // Reset model appearance
+                        if (loadedModel) {
+                            loadedModel.traverse(function(child) {
+                                if (child instanceof THREE.Mesh && child.material.userData.originalColor) {
+                                    child.material.color.copy(child.material.userData.originalColor);
+                                    child.material.emissive = new THREE.Color(0, 0, 0);
+                                    child.material.opacity = 0.7;
+                                }
+                            });
+                        }
+                    } else {
+                        const percent = (disintegrateProgress / maxDisintegrateTime) * 100;
+                        progressBar.style.width = percent + '%';
+                        
+                        // Update model glow to match progress
+                        if (loadedModel) {
+                            loadedModel.traverse(function(child) {
+                                if (child instanceof THREE.Mesh && child.material.userData.originalColor) {
+                                    // Calculate glowIntensity based on current progress
+                                    const glowIntensity = percent / 100;
+                                    
+                                    // Smoothly transition color back to original
+                                    const color = new THREE.Color().lerpColors(
+                                        child.material.userData.originalColor,
+                                        new THREE.Color(1, 0.3, 0),
+                                        glowIntensity
+                                    );
+                                    
+                                    child.material.color.copy(color);
+                                    child.material.emissive = new THREE.Color(
+                                        color.r * glowIntensity, 
+                                        color.g * glowIntensity * 0.3, 
+                                        0
+                                    );
+                                    
+                                    // Restore opacity
+                                    child.material.opacity = 0.7;
+                                }
+                            });
+                        }
+                    }
+                }, 16); // 60fps
+            }
+        }
+        
+
+        // Create explosion effect for disintegration
+        function createExplosionEffect(model) {
+            // Store the model's position and size before removing it
+            const modelPosition = model.position.clone();
+            const boundingBox = new THREE.Box3().setFromObject(model);
+            const modelSize = new THREE.Vector3();
+            boundingBox.getSize(modelSize);
+            
+            // Create explosion particles
+            const explosionParticleCount = 150;
+            const explosionRadius = Math.max(modelSize.x, modelSize.y, modelSize.z) / 2;
+            
+            // Determine color from model
+            let explosionColor = new THREE.Color(0xffffff); // Default white
+            
+            model.traverse(function(child) {
+                if (child instanceof THREE.Mesh && child.material.userData.originalColor) {
+                    explosionColor = child.material.userData.originalColor;
+                }
+            });
+            
+            // Create explosive particles at the model's position
+            for (let i = 0; i < explosionParticleCount; i++) {
+                // Get a random direction for the particle
+                const phi = Math.random() * Math.PI * 2;
+                const theta = Math.random() * Math.PI;
+                const radius = explosionRadius * (0.3 + Math.random() * 0.7);
+                
+                // Calculate position (spherical coordinates)
+                const x = modelPosition.x + radius * Math.sin(theta) * Math.cos(phi);
+                const y = modelPosition.y + radius * Math.sin(theta) * Math.sin(phi);
+                const z = modelPosition.z + radius * Math.cos(theta);
+                
+                // Create explosion particle
+                createExplosionParticle(
+                    new THREE.Vector3(x, y, z),
+                    new THREE.Vector3(
+                        (x - modelPosition.x) * (0.5 + Math.random() * 0.5) * 0.1,
+                        (y - modelPosition.y) * (0.5 + Math.random() * 0.5) * 0.1,
+                        (z - modelPosition.z) * (0.5 + Math.random() * 0.5) * 0.1
+                    ),
+                    explosionColor
+                );
+            }
+        }
+        
+        // Create an explosion particle from disintegration
+        function createExplosionParticle(position, velocity, color) {
+            // Use existing particles from the simulation for the explosion effect
+            const particleIndex = Math.floor(Math.random() * params.particleCount);
+            
+            // Set position and velocity
+            positions[particleIndex * 3] = position.x;
+            positions[particleIndex * 3 + 1] = position.y;
+            positions[particleIndex * 3 + 2] = position.z;
+            
+            velocities[particleIndex * 3] = velocity.x * 20;     // Scale for more explosive effect
+            velocities[particleIndex * 3 + 1] = velocity.y * 20;
+            velocities[particleIndex * 3 + 2] = velocity.z * 20;
+            
+            // If the particle system supports individual colors, we could set the color here
+            // For now, let's just use the existing particle system's color
+        }
+        
+        // Spawn particles for disintegration effect
+        function spawnDisintegrationParticles(count) {
+            if (!loadedModel) return;
+            
+            // Get the bounding box of the model
+            const boundingBox = new THREE.Box3().setFromObject(loadedModel);
+            const center = new THREE.Vector3();
+            boundingBox.getCenter(center);
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            
+            // Spawn particles from random points on the model
+            for (let i = 0; i < count; i++) {
+                // Find a random position within the bounding box
+                const x = center.x + (Math.random() - 0.5) * size.x;
+                const y = center.y + (Math.random() - 0.5) * size.y;
+                const z = center.z + (Math.random() - 0.5) * size.z;
+                
+                // Pick a random particle for this effect
+                const particleIndex = Math.floor(Math.random() * params.particleCount);
+                
+                // Set its position to the random location on the model
+                positions[particleIndex * 3] = x;
+                positions[particleIndex * 3 + 1] = y;
+                positions[particleIndex * 3 + 2] = z;
+                
+                // Give it an outward velocity from the center
+                const direction = new THREE.Vector3(x - center.x, y - center.y, z - center.z).normalize();
+                velocities[particleIndex * 3] = direction.x * 10;
+                velocities[particleIndex * 3 + 1] = direction.y * 10;
+                velocities[particleIndex * 3 + 2] = direction.z * 10;
+            }
+        }
+        
+        // OBJ Model loading
+        function loadOBJModel(file) {
+            // Remove existing model if any
+            if (loadedModel) {
+                scene.remove(loadedModel);
+                loadedModel = null;
+                modelMeshes = [];
+            }
+            
+            // Create a file URL
+            const fileURL = URL.createObjectURL(file);
+            
+            // Create OBJ loader
+            const objLoader = new THREE.OBJLoader();
+            
+            // Start loading
+            objLoader.load(
+                fileURL,
+                // onLoad callback
+                function(object) {
+                    // Calculate the bounding box to get dimensions
+                    const boundingBox = new THREE.Box3().setFromObject(object);
+                    const size = new THREE.Vector3();
+                    boundingBox.getSize(size);
+                    
+                    // Find the largest dimension
+                    const maxDimension = Math.max(size.x, size.y, size.z);
+                    
+                    // Calculate scaling factor to make largest dimension half the box width
+                    const targetSize = params.boundSize / 2;
+                    const scaleFactor = targetSize / maxDimension;
+                    
+                    // Apply scaling
+                    object.scale.set(scaleFactor, scaleFactor, scaleFactor);
+                    object.position.set(0, 0, 0);
+                    
+                    // Initialize physics properties
+                    object.userData = {
+                        velocity: new THREE.Vector3(0, 0, 0),
+                        angularVelocity: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5
+                        ),
+                        isDragging: false,
+                        isDraggable: true,
+                        mass: 1.0,
+                        dragStartRotation: new THREE.Euler()
+                    };
+                    
+                    // Apply materials and store meshes
+                    object.traverse(function(child) {
+                        if (child instanceof THREE.Mesh) {
+                            // Apply a standard material
+                            child.material = new THREE.MeshPhongMaterial({
+                                color: 0xcccccc,
+                                transparent: true,
+                                opacity: 0.7,
+                                side: THREE.DoubleSide,
+                                emissive: new THREE.Color(0, 0, 0),
+                                emissiveIntensity: 0
+                            });
+                            
+                            // Store meshes for collision detection
+                            modelMeshes.push({
+                                mesh: child,
+                                geometry: child.geometry,
+                                // Create bounding box for collision detection
+                                boundingBox: new THREE.Box3().setFromObject(child)
+                            });
+                        }
+                    });
+                    
+                    // Add to scene
+                    scene.add(object);
+                    loadedModel = object;
+                    
+                    // Show the disintegrate button
+                    document.getElementById('disintegrate-button').style.display = 'block';
+                    
+                    // Release URL
+                    URL.revokeObjectURL(fileURL);
+                    
+                    console.log('Model loaded successfully', object);
+                },
+                // onProgress callback
+                function(xhr) {
+                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                // onError callback
+                function(error) {
+                    console.error('Error loading model:', error);
+                    URL.revokeObjectURL(fileURL);
+                }
+            );
+        }
+
+        // Mouse interaction functions for object dragging
+        function onMouseDown(event) {
+            // Calculate mouse position in normalized device coordinates (-1 to +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Update the picking ray with the camera and mouse position
+            raycaster.setFromCamera(mouse, camera);
+            
+            // If we have a model, check for intersections
+            if (loadedModel) {
+                const intersects = raycaster.intersectObject(loadedModel, true);
+                
+                if (intersects.length > 0) {
+                    // Disable OrbitControls temporarily
+                    controls.enabled = false;
+                    
+                    // Start dragging
+                    isDragging = true;
+                    selectedObject = loadedModel;
+                    
+                    // Calculate the offset
+                    const intersectionPoint = intersects[0].point;
+                    dragOffset.copy(intersectionPoint).sub(loadedModel.position);
+                    
+                    // Store current rotation and physics state
+                    loadedModel.userData.dragStartRotation = loadedModel.rotation.clone();
+                    
+                    // We don't stop physics completely - we'll still allow rotation
+                    loadedModel.userData.isDragging = true;
+                }
+            }
+        }
+        
+        function onMouseMove(event) {
+            if (isDragging && selectedObject) {
+                // Update mouse position
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Cast a ray from the camera to the mouse position
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Calculate a plane perpendicular to the camera direction
+                const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
+                const plane = new THREE.Plane(planeNormal, -selectedObject.position.z);
+                
+                // Find the point of intersection with the plane
+                const intersection = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersection);
+                
+                // Set object position, accounting for the offset
+                const newPosition = intersection.clone().sub(dragOffset);
+                
+                // Apply new position to object's physics state
+                selectedObject.userData.velocity.copy(newPosition.clone().sub(selectedObject.position).multiplyScalar(20));
+                selectedObject.position.copy(newPosition);
+                
+                // Update bounding boxes for collision
+                updateModelBoundingBoxes();
+            }
+        }
+        
+        function onMouseUp(event) {
+            if (isDragging) {
+                isDragging = false;
+                
+                if (selectedObject) {
+                    // Release the object but keep its momentum
+                    selectedObject.userData.isDragging = false;
+                    selectedObject = null;
+                }
+                
+                // Re-enable OrbitControls
+                controls.enabled = true;
+            }
+        }
+
+
+        // Update model bounding boxes
+        function updateModelBoundingBoxes() {
+            if (loadedModel) {
+                modelMeshes = []; // Clear previous meshes
+                loadedModel.traverse(function(child) {
+                    if (child instanceof THREE.Mesh) {
+                        const boundingBox = new THREE.Box3().setFromObject(child);
+                        modelMeshes.push({
+                            mesh: child,
+                            geometry: child.geometry,
+                            boundingBox: boundingBox
+                        });
+                    }
+                });
+            }
+        }
