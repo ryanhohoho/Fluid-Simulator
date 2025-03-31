@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Fluid Simulation</title>
+    <style>
+        :root {
+            /* Dark mode (default) */
+            --bg-color: #000;
+            --text-color: #fff;
+            --panel-bg: #111;
+            --panel-bg-translucent: rgba(17, 17, 17, 0.9);
+            --panel-border: #333;
+            --primary-color: #0070f3; /* Vercel blue */
+            --secondary-color: #333;
+            --secondary-hover: #444;
+            --accent-color: #0070f3;
+            --border-color: #333;
+            --slider-track: #333;
+            --slider-thumb: #fff;
+            --button-bg: #0070f3;
+            --button-hover: #0050bb;
+            --button-text: #fff;
+            --success-color: #0aeb6f;
+            --error-color: #ff4545;
+            --warning-color: #ffcc00;
+            --info-panel: rgba(17, 17, 17, 0.9);
+        }
+
+        [data-theme="light"] {
+            --bg-color: #fff;
+            --text-color: #000;
+            --panel-bg: #f5f5f5;
+            --panel-bg-translucent: rgba(245, 245, 245, 0.9);
+            --panel-border: #eaeaea;
+            --primary-color: #0070f3;
+            --secondary-color: #eaeaea;
+            --secondary-hover: #ddd;
+            --accent-color: #0070f3;
+            --border-color: #eaeaea;
+            --slider-track: #ddd;
+            --slider-thumb: #0070f3;
+            --button-bg: #0070f3;
+            --button-hover: #0050bb;
+            --button-text: #fff;
+            --success-color: #0aeb6f;
+            --error-color: #ff4545;
+            --warning-color: #ffcc00;
+            --info-panel: rgba(245, 245, 245, 0.9);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Navigation bar */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            padding: 0 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--bg-color);
+            z-index: 1000;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+        }
+
+        .logo-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            overflow: hidden;
+        }
+
+        .logo-img {
+            max-width: 100%;
+            max-height: 100%;
+            display: none; /* Will be shown when loaded */
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .nav-link {
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            transition: opacity 0.2s ease;
+        }
+
+        .nav-link:hover {
+            opacity: 1;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .button {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            border: none;
+        }
+
+        .button-primary {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+        }
+
+        .button-primary:hover {
+            background-color: var(--button-hover);
+        }
+
+        .button-secondary {
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+        }
+
+        .button-secondary:hover {
+            background-color: var(--secondary-hover);
+        }
+
+        .button-outline {
+            background-color: transparent;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .button-outline:hover {
+            border-color: var(--text-color);
+        }
+
+        /* Canvas */
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            display: block;
+        }
+
+        /* Mode indicator */
+        .info-panel {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            padding: 1rem 1.5rem;
+            background-color: var(--info-panel);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            max-width: 320px;
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .info-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-title .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+        }
+
+        .info-content {
+            margin-bottom: 1rem;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            gap: 0.5rem;
+        }
+
+        .info-item span {
+            display: inline-block;
+        }
+
+        .status-text {
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        .mode-indicator {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        /* Settings panel */
+        .settings-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: 320px;
+            background-color: var(--panel-bg-translucent);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 100;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--secondary-color) transparent;
+            transition: all 0.3s ease;
+            transform: translateX(0);
+        }
+
+        .settings-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .settings-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .settings-panel::-webkit-scrollbar-thumb {
+            background-color: var(--secondary-color);
+            border-radius: 6px;
+        }
+
+        .panel-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .panel-action {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-color);
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease;
+        }
+
+        .panel-action:hover {
+            background-color: var(--secondary-hover);
+        }
+
+        .section {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .control-name {
+            font-weight: 500;
+        }
+
+        .control-value {
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+
+        .slider {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--slider-track);
+            outline: none;
+            border-radius: 2px;
+            transition: background 0.2s ease;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--slider-thumb);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--slider-thumb);
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .slider::-moz-range-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        /* Theme switch */
+        .theme-switch {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .theme-switch label {
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-switch {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--secondary-color);
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider-switch:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider-switch {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .slider-switch:before {
+            transform: translateX(24px);
+        }
+
+        .theme-switch svg {
+            width: 16px;
+            height: 16px;
+            color: var(--text-color);
+        }
+
+        /* Loading screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 2000;
+            transition: opacity 0.5s ease;
+        }
+
+        .logo-container-large {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .loading-text {
+            margin-top: 2rem;
+            font-size: 1rem;
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-progress {
+            height: 4px;
+            width: 200px;
+            background-color: var(--secondary-color);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .loading-progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--primary-color);
+            transition: width 0.3s ease;
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem 1.5rem;
+            background-color: var(--panel-bg-translucent);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+            font-size: 0.85rem;
+        }
+
+        .footer-logo {
+            width: 24px;
+            height: 24px;
+        }
+
+        .footer-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .footer-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .footer-link {
+            color: var(--text-color);
+            text-decoration: none;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+
+        .footer-link:hover {
+            opacity: 1;
+        }
+
+        .status-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 0 1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .info-panel, .settings-panel {
+                width: calc(100% - 40px);
+                max-width: none;
+            }
+
+            .info-panel {
+                top: 70px;
+                left: 20px;
+                right: 20px;
+            }
+
+            .settings-panel {
+                top: auto;
+                bottom: 70px;
+                right: 20px;
+                max-height: 50vh;
+            }
+
+            .footer {
+                flex-direction: column;
+                gap: 0.5rem;
+                padding: 0.75rem 1rem;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 1rem;
+            }
+        }
+
+        /* Utility classes */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="logo-container-large">
+            <div class="logo-placeholder">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 0L40 20L20 40L0 20L20 0Z" fill="currentColor"/>
+                </svg>
+            </div>
+            <img src="" alt="Logo" class="logo-img" id="logo-large">
+        </div>
+        <div class="spinner"></div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="loading-progress-bar"></div>
+        </div>
+        <div class="loading-text">Loading Simulation...</div>
+    </div>
+
+    <!-- Navbar -->
+    <div class="navbar">
+        <div class="logo-container">
+            <div class="logo-placeholder" id="logo-placeholder">
+                <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 0L40 20L20 40L0 20L20 0Z" fill="currentColor"/>
+                </svg>
+            </div>
+            <img src="" alt="Logo" class="logo-img" id="logo-nav">
+        </div>
+        <div class="nav-links">
+            <a href="#" class="nav-link">Simulation</a>
+            <a href="#" class="nav-link">Objects</a>
+            <a href="#" class="nav-link">Settings</a>
+            <a href="#" class="nav-link">About</a>
+        </div>
+        <div class="nav-actions">
+            <button class="button button-outline" id="toggle-settings">Settings</button>
+            <button class="button button-primary" id="reset-simulation">Reset</button>
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <div class="info-title">
+            <div class="status-dot"></div>
+            <span>Fluid Simulation</span>
+        </div>
+        <div class="info-content">
+            <div class="info-item">
+                <span>• Press SPACE to toggle between:</span>
+            </div>
+            <div class="mode-indicator" id="mode-indicator">CAMERA MODE</div>
+            <div class="info-item">
+                <span>• Scroll to zoom in/out</span>
+            </div>
+            <div class="status-text" id="status">Initializing...</div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settings-panel">
+        <div class="panel-header">
+            <div class="panel-title">Simulation Controls</div>
+            <div class="panel-actions">
+                <button class="panel-action" id="collapse-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="theme-switch">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <label class="switch">
+                    <input type="checkbox" id="theme-toggle">
+                    <span class="slider-switch"></span>
+                </label>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Appearance</div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Particle Size</span>
+                    <span class="control-value" id="particle-size-value">0.70</span>
+                </div>
+                <input type="range" id="particle-size" class="slider" min="0.3" max="1.1" step="0.05" value="0.70">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Particle Count</span>
+                    <span class="control-value" id="particle-count-value">1500</span>
+                </div>
+                <input type="range" id="particle-count" class="slider" min="500" max="2500" step="100" value="1500">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Container Size</span>
+                    <span class="control-value" id="container-size-value">23.0</span>
+                </div>
+                <input type="range" id="container-size" class="slider" min="15" max="30" step="1" value="23">
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">Physics</div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Gravity Strength</span>
+                    <span class="control-value" id="gravity-value">0.14</span>
+                </div>
+                <input type="range" id="gravity" class="slider" min="0" max="0.3" step="0.01" value="0.14">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Energy Loss (Collisions)</span>
+                    <span class="control-value" id="energy-loss-value">0.25</span>
+                </div>
+                <input type="range" id="energy-loss" class="slider" min="0.05" max="0.5" step="0.05" value="0.25">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Friction</span>
+                    <span class="control-value" id="friction-value">0.00</span>
+                </div>
+                <input type="range" id="friction" class="slider" min="0" max="0.5" step="0.01" value="0.00">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Repulsion Strength</span>
+                    <span class="control-value" id="repulsion-value">0.20</span>
+                </div>
+                <input type="range" id="repulsion" class="slider" min="0.1" max="1.0" step="0.05" value="0.20">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Speed Limit</span>
+                    <span class="control-value" id="speed-limit-value">1.10</span>
+                </div>
+                <input type="range" id="speed-limit" class="slider" min="0.5" max="2.0" step="0.05" value="1.10">
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">Interaction</div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Mouse Influence Radius</span>
+                    <span class="control-value" id="mouse-radius-value">5.0</span>
+                </div>
+                <input type="range" id="mouse-radius" class="slider" min="2" max="8" step="0.5" value="5.0">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span class="control-name">Mouse Force Strength</span>
+                    <span class="control-value" id="mouse-strength-value">2.00</span>
+                </div>
+                <input type="range" id="mouse-strength" class="slider" min="0.5" max="3.5" step="0.1" value="2.00">
+            </div>
+        </div>
+        
+        <div class="section">
+            <button id="reset-button" class="button button-primary" style="width: 100%;">Reset Simulation</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="footer-info">
+            <div class="logo-container footer-logo">
+                <div class="logo-placeholder">
+                    <svg width="20" height="20" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 0L40 20L20 40L0 20L20 0Z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <img src="" alt="Logo" class="logo-img" id="logo-footer">
+            </div>
+            <div class="status-info">
+                <div class="status-dot"></div>
+                <span>All systems normal</span>
+            </div>
+        </div>
+        <div class="footer-links">
+            <a href="#" class="footer-link">About</a>
+            <a href="#" class="footer-link">Documentation</a>
+            <a href="#" class="footer-link">GitHub</a>
+        </div>
+    </div>
+
+    <!-- Canvas for the simulation -->
+    <canvas id="canvas"></canvas>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // OrbitControls implementation
+        class OrbitControls {
+            constructor(camera, domElement) {
+                this.camera = camera;
+                this.domElement = domElement;
+                this.target = new THREE.Vector3();
+                
+                this.enabled = true;
+                this.enableDamping = true;
+                this.dampingFactor = 0.05;
+                this.rotateSpeed = 1.0;
+                this.zoomSpeed = 1.0;
+                this.maxDistance = 100;
+                this.minDistance = 5;
+                this.maxPolarAngle = Math.PI * 0.9;
+                this.minPolarAngle = 0.1;
+                
+                // Internal state
+                this.spherical = new THREE.Spherical();
+                this.sphericalDelta = new THREE.Spherical();
+                this.scale = 1;
+                this.zoomFrag = 0;
+                this.isRotating = false;
+                this.isZooming = false;
+                
+                // Initial position
+                const position = this.camera.position.clone();
+                this.spherical.setFromVector3(position.sub(this.target));
+                
+                // Event listeners
+                this.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
+                document.addEventListener('mouseup', this.onMouseUp.bind(this));
+                document.addEventListener('mousemove', this.onMouseMove.bind(this));
+                this.domElement.addEventListener('wheel', this.onMouseWheel.bind(this));
+            }
+            
+            onMouseDown(event) {
+                if (!this.enabled) return;
+                
+                if (event.button === 0) { // Left click
+                    this.isRotating = true;
+                    this.rotateStart = {
+                        x: event.clientX,
+                        y: event.clientY
+                    };
+                }
+            }
+            
+            onMouseUp() {
+                this.isRotating = false;
+            }
+            
+            onMouseMove(event) {
+                if (!this.enabled || !this.isRotating) return;
+                
+                const deltaX = event.clientX - this.rotateStart.x;
+                const deltaY = event.clientY - this.rotateStart.y;
+                
+                // Update rotation
+                this.sphericalDelta.theta -= 2 * Math.PI * deltaX / this.domElement.clientWidth * this.rotateSpeed;
+                this.sphericalDelta.phi -= 2 * Math.PI * deltaY / this.domElement.clientHeight * this.rotateSpeed;
+                
+                this.rotateStart.x = event.clientX;
+                this.rotateStart.y = event.clientY;
+            }
+            
+            onMouseWheel(event) {
+                if (!this.enabled) return;
+                
+                event.preventDefault();
+                
+                if (event.deltaY < 0) {
+                    this.scale *= 0.9; // Zoom in
+                } else {
+                    this.scale *= 1.1; // Zoom out
+                }
+            }
+            
+            update() {
+                if (!this.enabled) return false;
+                
+                // Apply rotation
+                this.spherical.theta += this.sphericalDelta.theta * this.dampingFactor;
+                this.spherical.phi += this.sphericalDelta.phi * this.dampingFactor;
+                
+                // Apply damping
+                this.sphericalDelta.theta *= (1 - this.dampingFactor);
+                this.sphericalDelta.phi *= (1 - this.dampingFactor);
+                
+                // Restrict phi within bounds
+                this.spherical.phi = Math.max(this.minPolarAngle, Math.min(this.maxPolarAngle, this.spherical.phi));
+                
+                // Apply scale (zoom)
+                this.spherical.radius *= this.scale;
+                this.spherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, this.spherical.radius));
+                this.scale = 1;
+                
+                // Update camera position
+                const offset = new THREE.Vector3();
+                offset.setFromSpherical(this.spherical);
+                offset.add(this.target);
+                
+                this.camera.position.copy(offset);
+                this.camera.lookAt(this.target);
+                
+                return true;
+            }
+        }
+
+        // Particle Simulation Class
+        class ParticleSimulation {
+            constructor() {
+                this.statusElement = document.getElementById('status');
+                this.modeIndicator = document.getElementById('mode-indicator');
+                this.updateStatus("Setting up simulation...");
+                
+                // Default simulation parameters
+                this.params = {
+                    particleCount: 1500,
+                    particleSize: 0.70,
+                    containerSize: 23.0,
+                    gravity: 0.14,
+                    energyLoss: 0.25,
+                    friction: 0.00,
+                    repulsion: 0.20,
+                    speedLimit: 1.10,
+                    mouseRadius: 5.0,
+                    mouseStrength: 2.00,
+                    boundSize: 23.0 // Added for easy reference
+                };
+                
+                // States for recreation
+                this.recreateParticlesNeeded = false;
+                this.recreateContainerNeeded = false;
+                
+                // Interaction modes
+                this.interactionMode = 'camera'; // 'camera' or 'interaction'
+                this.updateModeIndicator();
+                
+                // Simulation state
+                this.particles = [];
+                this.velocities = [];
+                this.radii = [];
+                this.masses = [];
+                
+                // Mouse interaction
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                this.mousePosition3D = new THREE.Vector3();
+                this.prevMousePosition3D = new THREE.Vector3();
+                this.mouseVelocity = new THREE.Vector3();
+                this.isMouseDown = false;
+                this.intersectionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1));
+                
+                try {
+                    this.init();
+                    this.updateStatus("Simulation running");
+                    this.setupUIControls();
+                    this.setupKeyboardControls();
+                } catch (error) {
+                    console.error("Initialization error:", error);
+                    this.updateStatus("Error: " + error.message);
+                }
+            }
+            
+            updateStatus(message) {
+                if (this.statusElement) {
+                    this.statusElement.textContent = message;
+                }
+                console.log(message);
+            }
+            
+            setupKeyboardControls() {
+                // Set up keyboard controls for toggling interaction mode
+                document.addEventListener('keydown', (event) => {
+                    if (event.code === 'Space') {
+                        event.preventDefault(); // Prevent page scrolling
+                        
+                        // Toggle interaction mode
+                        this.interactionMode = (this.interactionMode === 'camera') ? 'interaction' : 'camera';
+                        
+                        // Update controls
+                        if (this.controls) {
+                            this.controls.enabled = (this.interactionMode === 'camera');
+                        }
+                        
+                        // Update display
+                        this.updateModeIndicator();
+                    }
+                });
+            }
+            
+            updateModeIndicator() {
+                if (this.modeIndicator) {
+                    if (this.interactionMode === 'camera') {
+                        this.modeIndicator.textContent = 'CAMERA MODE';
+                    } else {
+                        this.modeIndicator.textContent = 'INTERACTION MODE';
+                    }
+                }
+            }
+            
+            setupUIControls() {
+                // Set up UI controls
+                const controls = {
+                    // Appearance
+                    particleSize: document.getElementById('particle-size'),
+                    particleSizeValue: document.getElementById('particle-size-value'),
+                    particleCount: document.getElementById('particle-count'),
+                    particleCountValue: document.getElementById('particle-count-value'),
+                    containerSize: document.getElementById('container-size'),
+                    containerSizeValue: document.getElementById('container-size-value'),
+                    
+                    // Physics
+                    gravity: document.getElementById('gravity'),
+                    gravityValue: document.getElementById('gravity-value'),
+                    energyLoss: document.getElementById('energy-loss'),
+                    energyLossValue: document.getElementById('energy-loss-value'),
+                    friction: document.getElementById('friction'),
+                    frictionValue: document.getElementById('friction-value'),
+                    repulsion: document.getElementById('repulsion'),
+                    repulsionValue: document.getElementById('repulsion-value'),
+                    speedLimit: document.getElementById('speed-limit'),
+                    speedLimitValue: document.getElementById('speed-limit-value'),
+                    
+                    // Interaction
+                    mouseRadius: document.getElementById('mouse-radius'),
+                    mouseRadiusValue: document.getElementById('mouse-radius-value'),
+                    mouseStrength: document.getElementById('mouse-strength'),
+                    mouseStrengthValue: document.getElementById('mouse-strength-value'),
+                    
+                    // Buttons
+                    resetButton: document.getElementById('reset-button')
+                };
+                
+                // Initialize sliders with current values
+                controls.particleSize.value = this.params.particleSize;
+                controls.particleSizeValue.textContent = this.params.particleSize.toFixed(2);
+                
+                controls.particleCount.value = this.params.particleCount;
+                controls.particleCountValue.textContent = this.params.particleCount;
+                
+                controls.containerSize.value = this.params.containerSize;
+                controls.containerSizeValue.textContent = this.params.containerSize.toFixed(1);
+                
+                controls.gravity.value = this.params.gravity;
+                controls.gravityValue.textContent = this.params.gravity.toFixed(2);
+                
+                controls.energyLoss.value = this.params.energyLoss;
+                controls.energyLossValue.textContent = this.params.energyLoss.toFixed(2);
+                
+                controls.friction.value = this.params.friction;
+                controls.frictionValue.textContent = this.params.friction.toFixed(2);
+                
+                controls.repulsion.value = this.params.repulsion;
+                controls.repulsionValue.textContent = this.params.repulsion.toFixed(2);
+                
+                controls.speedLimit.value = this.params.speedLimit;
+                controls.speedLimitValue.textContent = this.params.speedLimit.toFixed(2);
+                
+                controls.mouseRadius.value = this.params.mouseRadius;
+                controls.mouseRadiusValue.textContent = this.params.mouseRadius.toFixed(1);
+                
+                controls.mouseStrength.value = this.params.mouseStrength;
+                controls.mouseStrengthValue.textContent = this.params.mouseStrength.toFixed(2);
+                
+                // Set up event listeners for controls
+                controls.particleSize.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.particleSize.value);
+                    controls.particleSizeValue.textContent = newValue.toFixed(2);
+                    this.params.particleSize = newValue;
+                    this.recreateParticlesNeeded = true;
+                });
+                
+                controls.particleCount.addEventListener('input', () => {
+                    const newValue = parseInt(controls.particleCount.value);
+                    controls.particleCountValue.textContent = newValue;
+                    this.params.particleCount = newValue;
+                    this.recreateParticlesNeeded = true;
+                });
+                
+                controls.containerSize.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.containerSize.value);
+                    controls.containerSizeValue.textContent = newValue.toFixed(1);
+                    this.params.containerSize = newValue;
+                    this.params.boundSize = newValue; // Update bound size as well
+                    this.recreateContainerNeeded = true;
+                });
+                
+                controls.gravity.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.gravity.value);
+                    controls.gravityValue.textContent = newValue.toFixed(2);
+                    this.params.gravity = newValue;
+                });
+                
+                controls.energyLoss.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.energyLoss.value);
+                    controls.energyLossValue.textContent = newValue.toFixed(2);
+                    this.params.energyLoss = newValue;
+                });
+                
+                controls.friction.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.friction.value);
+                    controls.frictionValue.textContent = newValue.toFixed(2);
+                    this.params.friction = newValue;
+                });
+                
+                controls.repulsion.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.repulsion.value);
+                    controls.repulsionValue.textContent = newValue.toFixed(2);
+                    this.params.repulsion = newValue;
+                });
+                
+                controls.speedLimit.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.speedLimit.value);
+                    controls.speedLimitValue.textContent = newValue.toFixed(2);
+                    this.params.speedLimit = newValue;
+                });
+                
+                controls.mouseRadius.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.mouseRadius.value);
+                    controls.mouseRadiusValue.textContent = newValue.toFixed(1);
+                    this.params.mouseRadius = newValue;
+                });
+                
+                controls.mouseStrength.addEventListener('input', () => {
+                    const newValue = parseFloat(controls.mouseStrength.value);
+                    controls.mouseStrengthValue.textContent = newValue.toFixed(2);
+                    this.params.mouseStrength = newValue;
+                });
+                
+                // Reset button
+                controls.resetButton.addEventListener('click', () => {
+                    this.resetSimulation();
+                });
+                
+                // Reset button in navbar
+                document.getElementById('reset-simulation').addEventListener('click', () => {
+                    this.resetSimulation();
+                });
+                
+                // Settings panel toggle
+                const toggleSettingsBtn = document.getElementById('toggle-settings');
+                const settingsPanel = document.getElementById('settings-panel');
+                const collapseButton = document.getElementById('collapse-button');
+                
+                let settingsPanelVisible = true;
+                
+                toggleSettingsBtn.addEventListener('click', function() {
+                    if (settingsPanelVisible) {
+                        settingsPanel.style.transform = 'translateX(350px)';
+                        settingsPanelVisible = false;
+                    } else {
+                        settingsPanel.style.transform = 'translateX(0)';
+                        settingsPanelVisible = true;
+                    }
+                });
+                
+                collapseButton.addEventListener('click', function() {
+                    settingsPanel.style.transform = 'translateX(350px)';
+                    settingsPanelVisible = false;
+                });
+            }
+            
+            resetSimulation() {
+                this.updateStatus("Resetting simulation...");
+                
+                // Clear existing particles
+                this.clearParticles();
+                
+                // Recreate container if needed
+                if (this.recreateContainerNeeded) {
+                    this.clearContainer();
+                    this.createContainer();
+                    this.recreateContainerNeeded = false;
+                }
+                
+                // Recreate particles
+                this.initParticles();
+                this.recreateParticlesNeeded = false;
+                
+                this.updateStatus("Simulation reset complete");
+            }
+            
+            clearParticles() {
+                // Reset particle arrays
+                this.particles = [];
+                this.velocities = [];
+                this.radii = [];
+                this.masses = [];
+                
+                // Remove particles from scene
+                if (this.container) {
+                    // Keep the first 6 children (container box and panels)
+                    while (this.container.children.length > 6) {
+                        const particle = this.container.children[6];
+                        this.container.remove(particle);
+                        if (particle.geometry) particle.geometry.dispose();
+                        if (particle.material) particle.material.dispose();
+                    }
+                }
+            }
+            
+            clearContainer() {
+                if (this.container) {
+                    while (this.container.children.length > 0) {
+                        const child = this.container.children[0];
+                        this.container.remove(child);
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) child.material.dispose();
+                    }
+                }
+            }
+            
+            init() {
+                this.updateStatus("Initializing renderer...");
+                this.initRenderer();
+                
+                this.updateStatus("Setting up lighting...");
+                this.initLights();
+                
+                this.updateStatus("Creating container...");
+                this.createContainer();
+                
+                this.updateStatus("Creating particles...");
+                this.initParticles();
+                
+                this.updateStatus("Setting up controls...");
+                this.setupControls();
+                
+                // Set up spatial grid for collision detection
+                this.updateStatus("Setting up spatial partitioning...");
+                this.setupSpatialGrid();
+                
+                // Set up event listeners
+                window.addEventListener('resize', this.onWindowResize.bind(this));
+                this.renderer.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
+                this.renderer.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
+                document.addEventListener('mouseup', this.onMouseUp.bind(this));
+                
+                // Start animation loop
+                this.animate();
+            }
+            
+            setupSpatialGrid() {
+                // For efficient collision detection
+                this.gridCellSize = this.params.particleSize * 4; // Cell size based on particle size
+                this.spatialGrid = {};
+            }
+            
+            updateSpatialGrid() {
+                // Clear the grid
+                this.spatialGrid = {};
+                
+                // Add particles to spatial grid
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p = this.particles[i];
+                    const cellX = Math.floor(p.x / this.gridCellSize);
+                    const cellY = Math.floor(p.y / this.gridCellSize);
+                    const cellZ = Math.floor(p.z / this.gridCellSize);
+                    
+                    // Create a unique key for this cell
+                    const key = `${cellX},${cellY},${cellZ}`;
+                    
+                    if (!this.spatialGrid[key]) {
+                        this.spatialGrid[key] = [];
+                    }
+                    
+                    this.spatialGrid[key].push(i);
+                }
+            }
+            
+            getNeighbors(particleIndex) {
+                const neighbors = [];
+                const p = this.particles[particleIndex];
+                
+                // Calculate grid cell
+                const cellX = Math.floor(p.x / this.gridCellSize);
+                const cellY = Math.floor(p.y / this.gridCellSize);
+                const cellZ = Math.floor(p.z / this.gridCellSize);
+                
+                // Check current cell and all adjacent cells (27 cells total)
+                for (let x = cellX - 1; x <= cellX + 1; x++) {
+                    for (let y = cellY - 1; y <= cellY + 1; y++) {
+                        for (let z = cellZ - 1; z <= cellZ + 1; z++) {
+                            const key = `${x},${y},${z}`;
+                            
+                            if (this.spatialGrid[key]) {
+                                for (const neighborIdx of this.spatialGrid[key]) {
+                                    if (neighborIdx !== particleIndex) {
+                                        neighbors.push(neighborIdx);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return neighbors;
+            }
+            
+            initRenderer() {
+                // Set up three.js scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000000); // Dark background by default
+                
+                // Set up camera
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+                this.camera.position.set(25, 25, 25);
+                this.camera.lookAt(0, 0, 0);
+                
+                // Set up renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('canvas').replaceWith(this.renderer.domElement);
+                this.renderer.domElement.id = 'canvas';
+                
+                // Add fog for depth perception
+                this.scene.fog = new THREE.Fog(0x000000, 70, 100);
+                
+                // Add event listener for theme changes to update fog and background
+                document.addEventListener('themeChange', (e) => {
+                    const theme = e.detail.theme;
+                    if (theme === 'light') {
+                        this.scene.background = new THREE.Color(0xffffff);
+                        this.scene.fog = new THREE.Fog(0xffffff, 70, 100);
+                    } else {
+                        this.scene.background = new THREE.Color(0x000000);
+                        this.scene.fog = new THREE.Fog(0x000000, 70, 100);
+                    }
+                });
+            }
+            
+            initLights() {
+                // Main directional light
+                const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                mainLight.position.set(10, 30, 15);
+                mainLight.castShadow = true;
+                
+                mainLight.shadow.camera.left = -30;
+                mainLight.shadow.camera.right = 30;
+                mainLight.shadow.camera.top = 30;
+                mainLight.shadow.camera.bottom = -30;
+                mainLight.shadow.camera.near = 0.1;
+                mainLight.shadow.camera.far = 100;
+                mainLight.shadow.mapSize.width = 1024;
+                mainLight.shadow.mapSize.height = 1024;
+                this.scene.add(mainLight);
+                
+                // Ambient light
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+                this.scene.add(ambientLight);
+                
+                // Fill light for better visibility
+                const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+                fillLight.position.set(-10, 5, -10);
+                this.scene.add(fillLight);
+            }
+            
+            createContainer() {
+                const size = this.params.containerSize;
+                const halfSize = size / 2;
+                
+                // Create a group for the container
+                this.container = new THREE.Group();
+                this.scene.add(this.container);
+                
+                // Create box edges with thicker lines
+                const boxGeometry = new THREE.BoxGeometry(size, size, size);
+                const boxEdges = new THREE.EdgesGeometry(boxGeometry);
+                const edgeMaterial = new THREE.LineBasicMaterial({ 
+                    color: 0x0070f3, // Vercel blue
+                    opacity: 0.8, 
+                    transparent: true,
+                    linewidth: 1.5
+                });
+                const boxOutline = new THREE.LineSegments(boxEdges, edgeMaterial);
+                this.container.add(boxOutline);
+                
+                // Create semi-transparent sides
+                const panelMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x0070f3,
+                    opacity: 0.1,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                });
+                
+                // Bottom panel
+                const bottomPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    panelMaterial.clone()
+                );
+                bottomPanel.rotation.x = Math.PI / 2;
+                bottomPanel.position.y = -halfSize;
+                this.container.add(bottomPanel);
+                
+                // Side panels (slightly visible)
+                const sidePanelMaterial = panelMaterial.clone();
+                sidePanelMaterial.opacity = 0.05;
+                
+                // Front panel (z+)
+                const frontPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    sidePanelMaterial
+                );
+                frontPanel.position.z = halfSize;
+                this.container.add(frontPanel);
+                
+                // Back panel (z-)
+                const backPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    sidePanelMaterial
+                );
+                backPanel.position.z = -halfSize;
+                backPanel.rotation.y = Math.PI;
+                this.container.add(backPanel);
+                
+                // Left panel (x-)
+                const leftPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    sidePanelMaterial
+                );
+                leftPanel.position.x = -halfSize;
+                leftPanel.rotation.y = Math.PI / 2;
+                this.container.add(leftPanel);
+                
+                // Right panel (x+)
+                const rightPanel = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size),
+                    sidePanelMaterial
+                );
+                rightPanel.position.x = halfSize;
+                rightPanel.rotation.y = -Math.PI / 2;
+                this.container.add(rightPanel);
+                
+                // Ground plane for shadows
+                if (this.groundPlane) {
+                    this.scene.remove(this.groundPlane);
+                }
+                
+                this.groundPlane = new THREE.Mesh(
+                    new THREE.PlaneGeometry(100, 100),
+                    new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.9 })
+                );
+                this.groundPlane.rotation.x = -Math.PI / 2;
+                this.groundPlane.position.y = -halfSize - 0.01;
+                this.groundPlane.receiveShadow = true;
+                this.scene.add(this.groundPlane);
+            }
+            
+            initParticles() {
+                const baseSize = this.params.particleSize;
+                const variation = 0.2; // Size variation (20%)
+                
+                // Make water-like material
+                const waterMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x0070f3, // Vercel blue
+                    metalness: 0.2,
+                    roughness: 0.1,
+                    transparent: true,
+                    opacity: 0.7,
+                    clearcoat: 0.5,
+                    clearcoatRoughness: 0.2,
+                    transmission: 0.1,
+                    depthWrite: true
+                });
+                
+                // Calculate dimensions to fill approximately half the box
+                const halfSize = this.params.containerSize / 2;
+                const boxVolume = this.params.containerSize * this.params.containerSize * this.params.containerSize;
+                const targetVolume = boxVolume * 0.5; // Fill about half the container
+                
+                // Calculate the spacing based on particle size
+                const minSpacing = baseSize * 2.1; // Slightly more than 2x radius to prevent initial overlaps
+                
+                // Calculate particles per dimension to create a rectangular prism
+                const fillHeight = halfSize * 0.95; // Fill slightly less than half the height
+                const particlesY = Math.floor(fillHeight / minSpacing);
+                const particlesXZ = Math.ceil(Math.sqrt(this.params.particleCount / particlesY));
+                
+                // Calculate starting position to center the particles
+                const startX = -halfSize + minSpacing/2;
+                const startY = -halfSize + minSpacing/2; // Start from bottom
+                const startZ = -halfSize + minSpacing/2;
+                
+                // Create particles with slight size variations
+                let particleIndex = 0;
+                for (let y = 0; y < particlesY && particleIndex < this.params.particleCount; y++) {
+                    for (let x = 0; x < particlesXZ && particleIndex < this.params.particleCount; x++) {
+                        for (let z = 0; z < particlesXZ && particleIndex < this.params.particleCount; z++) {
+                            // Add random variation to size
+                            const sizeVariation = 1.0 - variation/2 + Math.random() * variation;
+                            const radius = baseSize * sizeVariation;
+                            
+                            // Calculate position with small random offset
+                            const xPos = startX + x * minSpacing + (Math.random() * 0.2 - 0.1) * minSpacing;
+                            const yPos = startY + y * minSpacing + (Math.random() * 0.2 - 0.1) * minSpacing;
+                            const zPos = startZ + z * minSpacing + (Math.random() * 0.2 - 0.1) * minSpacing;
+                            
+                            // Skip particles outside the container bounds
+                            if (xPos > halfSize || yPos > halfSize || zPos > halfSize ||
+                                xPos < -halfSize || yPos < -halfSize || zPos < -halfSize) {
+                                continue;
+                            }
+                            
+                            // Create geometry with the specific radius
+                            const geometry = new THREE.SphereGeometry(radius, 12, 8);
+                            
+                            // Create particle mesh with the material
+                            const particle = new THREE.Mesh(geometry, waterMaterial.clone());
+                            particle.position.set(xPos, yPos, zPos);
+                            particle.castShadow = true;
+                            particle.receiveShadow = true;
+                            this.container.add(particle);
+                            
+                            // Store particle data
+                            this.particles.push(particle.position);
+                            this.velocities.push(new THREE.Vector3(0, 0, 0));
+                            this.radii.push(radius);
+                            this.masses.push(Math.pow(radius, 3)); // Mass proportional to volume
+                            
+                            particleIndex++;
+                            
+                            // Stop if we've created enough particles
+                            if (particleIndex >= this.params.particleCount) break;
+                        }
+                        if (particleIndex >= this.params.particleCount) break;
+                    }
+                    if (particleIndex >= this.params.particleCount) break;
+                }
+                
+                // Log the actual number of particles created
+                this.updateStatus(`Created ${particleIndex} particles`);
+            }
+            
+            // Handle collisions between particles using a solid-body approach
+            handleCollisions() {
+                // Update spatial grid for efficient collision detection
+                this.updateSpatialGrid();
+                
+                // Check for collisions between nearby particles
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p1 = this.particles[i];
+                    const v1 = this.velocities[i];
+                    const r1 = this.radii[i];
+                    const m1 = this.masses[i];
+                    
+                    // Get potential collision candidates
+                    const neighbors = this.getNeighbors(i);
+                    
+                    for (const j of neighbors) {
+                        const p2 = this.particles[j];
+                        const v2 = this.velocities[j];
+                        const r2 = this.radii[j];
+                        const m2 = this.masses[j];
+                        
+                        // Calculate distance between particles
+                        const dx = p2.x - p1.x;
+                        const dy = p2.y - p1.y;
+                        const dz = p2.z - p1.z;
+                        const distSq = dx*dx + dy*dy + dz*dz;
+                        const minDist = r1 + r2;
+                        
+                        // Check if collision occurred
+                        if (distSq < minDist * minDist) {
+                            const dist = Math.sqrt(distSq);
+                            
+                            // Calculate penetration depth
+                            const penetration = minDist - dist;
+                            
+                            if (penetration > 0) {
+                                // Calculate normal vector (direction from p1 to p2)
+                                const nx = dx / dist;
+                                const ny = dy / dist;
+                                const nz = dz / dist;
+                                
+                                // Calculate relative velocity along normal
+                                const vrx = v2.x - v1.x;
+                                const vry = v2.y - v1.y;
+                                const vrz = v2.z - v1.z;
+                                const vDotN = vrx * nx + vry * ny + vrz * nz;
+                                
+                                // If particles are moving toward each other
+                                if (vDotN < 0) {
+                                    // Calculate impulse scalar - with energy loss
+                                    const restitution = 1.0 - this.params.energyLoss; // 0 = all energy lost, 1 = no energy lost
+                                    const j = -(1 + restitution) * vDotN / (1/m1 + 1/m2);
+                                    
+                                    // Apply impulse along normal direction
+                                    const impulseX = j * nx;
+                                    const impulseY = j * ny;
+                                    const impulseZ = j * nz;
+                                    
+                                    // Update velocities based on impulse and mass
+                                    v1.x -= impulseX / m1;
+                                    v1.y -= impulseY / m1;
+                                    v1.z -= impulseZ / m1;
+                                    
+                                    v2.x += impulseX / m2;
+                                    v2.y += impulseY / m2;
+                                    v2.z += impulseZ / m2;
+                                    
+                                    // Apply friction - tangential impulse
+                                    const friction = this.params.friction;
+                                    
+                                    if (friction > 0) {
+                                        // Calculate relative velocity tangent
+                                        const tx = vrx - vDotN * nx;
+                                        const ty = vry - vDotN * ny;
+                                        const tz = vrz - vDotN * nz;
+                                        
+                                        const tLength = Math.sqrt(tx*tx + ty*ty + tz*tz);
+                                        
+                                        if (tLength > 0.001) {
+                                            // Normalized tangent vector
+                                            const tnx = tx / tLength;
+                                            const tny = ty / tLength;
+                                            const tnz = tz / tLength;
+                                            
+                                            // Tangential impulse
+                                            const jt = -friction * j;
+                                            
+                                            // Apply tangential impulse
+                                            v1.x -= jt * tnx / m1;
+                                            v1.y -= jt * tny / m1;
+                                            v1.z -= jt * tnz / m1;
+                                            
+                                            v2.x += jt * tnx / m2;
+                                            v2.y += jt * tny / m2;
+                                            v2.z += jt * tnz / m2;
+                                        }
+                                    }
+                                }
+                                
+                                // Prevent overlap by separating particles
+                                const totalMass = m1 + m2;
+                                const ratio1 = m2 / totalMass;
+                                const ratio2 = m1 / totalMass;
+                                
+                                // Adjust positions to prevent overlap
+                                p1.x -= nx * penetration * ratio1 * 0.5;
+                                p1.y -= ny * penetration * ratio1 * 0.5;
+                                p1.z -= nz * penetration * ratio1 * 0.5;
+                                
+                                p2.x += nx * penetration * ratio2 * 0.5;
+                                p2.y += ny * penetration * ratio2 * 0.5;
+                                p2.z += nz * penetration * ratio2 * 0.5;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Apply solid boundary collision
+            handleBoundaryCollisions() {
+                const halfSize = this.params.containerSize / 2;
+                
+                // Handle particle-boundary collisions
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p = this.particles[i];
+                    const v = this.velocities[i];
+                    const r = this.radii[i];
+                    
+                    // Bottom boundary
+                    if (p.y - r < -halfSize) {
+                        p.y = -halfSize + r;
+                        if (v.y < 0) {
+                            v.y = -v.y * (1 - this.params.energyLoss);
+                            // Apply friction with floor
+                            v.x *= (1 - this.params.friction);
+                            v.z *= (1 - this.params.friction);
+                        }
+                    }
+                    
+                    // Top boundary
+                    if (p.y + r > halfSize) {
+                        p.y = halfSize - r;
+                        if (v.y > 0) {
+                            v.y = -v.y * (1 - this.params.energyLoss);
+                        }
+                    }
+                    
+                    // Left boundary
+                    if (p.x - r < -halfSize) {
+                        p.x = -halfSize + r;
+                        if (v.x < 0) {
+                            v.x = -v.x * (1 - this.params.energyLoss);
+                        }
+                    }
+                    
+                    // Right boundary
+                    if (p.x + r > halfSize) {
+                        p.x = halfSize - r;
+                        if (v.x > 0) {
+                            v.x = -v.x * (1 - this.params.energyLoss);
+                        }
+                    }
+                    
+                    // Back boundary
+                    if (p.z - r < -halfSize) {
+                        p.z = -halfSize + r;
+                        if (v.z < 0) {
+                            v.z = -v.z * (1 - this.params.energyLoss);
+                        }
+                    }
+                    
+                    // Front boundary
+                    if (p.z + r > halfSize) {
+                        p.z = halfSize - r;
+                        if (v.z > 0) {
+                            v.z = -v.z * (1 - this.params.energyLoss);
+                        }
+                    }
+                }
+            }
+            
+            applyForces() {
+                // Apply gravity and mouse forces to particles
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p = this.particles[i];
+                    const v = this.velocities[i];
+                    
+                    // Apply gravity
+                    v.y -= this.params.gravity;
+                    
+                    // Apply mouse force if in interaction mode and dragging
+                    if (this.interactionMode === 'interaction' && this.isMouseDown) {
+                        const dist = p.distanceTo(this.mousePosition3D);
+                        
+                        if (dist < this.params.mouseRadius) {
+                            const strength = (1 - dist / this.params.mouseRadius) * this.params.mouseStrength;
+                            v.x += this.mouseVelocity.x * strength;
+                            v.y += this.mouseVelocity.y * strength;
+                            v.z += this.mouseVelocity.z * strength;
+                        }
+                    }
+                    
+                    // Apply speed limit to prevent instability
+                    const speedSq = v.x*v.x + v.y*v.y + v.z*v.z;
+                    const maxSpeed = this.params.speedLimit;
+                    
+                    if (speedSq > maxSpeed * maxSpeed) {
+                        const speed = Math.sqrt(speedSq);
+                        v.x = (v.x / speed) * maxSpeed;
+                        v.y = (v.y / speed) * maxSpeed;
+                        v.z = (v.z / speed) * maxSpeed;
+                    }
+                }
+            }
+            
+            update() {
+                // Check if we need to recreate the simulation
+                if (this.recreateParticlesNeeded || this.recreateContainerNeeded) {
+                    this.resetSimulation();
+                    return;
+                }
+                
+                // Apply forces (gravity, mouse interaction)
+                this.applyForces();
+                
+                // Update particle positions based on velocities
+                for (let i = 0; i < this.particles.length; i++) {
+                    this.particles[i].x += this.velocities[i].x;
+                    this.particles[i].y += this.velocities[i].y;
+                    this.particles[i].z += this.velocities[i].z;
+                }
+                
+                // Handle collisions between particles - solid body approach
+                this.handleCollisions();
+                
+                // Handle boundary collisions
+                this.handleBoundaryCollisions();
+                
+                // Update particle visuals (color based on velocity)
+                for (let i = 0; i < this.particles.length; i++) {
+                    const speed = this.velocities[i].length();
+                    const particle = this.container.children[i + 6]; // Skip container box and panels
+                    
+                    if (particle && particle.material) {
+                        // Calculate intensity based on speed
+                        const intensity = Math.min(speed * 2, 1);
+                        
+                        // Use the updated color calculation
+                        const r = 0.1 + intensity * 0.6;
+                        const g = 0.7 + intensity * 0.8;
+                        const b = 0.9;
+                        
+                        particle.material.color.setRGB(r, g, b);
+                        
+                        // Maintain a high opacity regardless of speed
+                        particle.material.opacity = intensity/5 + 0.3;
+                    }
+                }
+            }
+            
+            setupControls() {
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enabled = (this.interactionMode === 'camera');
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.1;
+                this.controls.rotateSpeed = 0.7;
+                this.controls.zoomSpeed = 1.0;
+                this.controls.minDistance = 10;
+                this.controls.maxDistance = 80;
+            }
+            
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                try {
+                    // Update controls if in camera mode
+                    if (this.controls && this.interactionMode === 'camera') {
+                        this.controls.update();
+                    }
+                    
+                    // Update simulation
+                    this.update();
+                    
+                    // Render scene
+                    this.renderer.render(this.scene, this.camera);
+                } catch (error) {
+                    console.error("Animation error:", error);
+                    this.updateStatus("Animation error: " + error.message);
+                }
+            }
+            
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            onMouseMove(event) {
+                // Skip if we're over a UI element
+                if (this.isOverUIElement(event)) return;
+                
+                // Calculate mouse position in normalized device coordinates (-1 to +1)
+                this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // If in interaction mode, handle mouse interaction with particles
+                if (this.interactionMode === 'interaction') {
+                    // Save previous position
+                    this.prevMousePosition3D.copy(this.mousePosition3D);
+                    
+                    // Cast ray from camera
+                    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    
+                    // Update intersection plane to face camera
+                    this.intersectionPlane.normal.copy(this.camera.getWorldDirection(new THREE.Vector3()).negate());
+                    
+                    // Find intersection with the plane
+                    const intersects = new THREE.Vector3();
+                    if (this.raycaster.ray.intersectPlane(this.intersectionPlane, intersects)) {
+                        this.mousePosition3D.copy(intersects);
+                        
+                        // Calculate velocity - limited to prevent explosions
+                        this.mouseVelocity.subVectors(this.mousePosition3D, this.prevMousePosition3D);
+                        
+                        // Limit mouse velocity to prevent explosions
+                        const maxMouseVel = 1.5;
+                        const mouseVelLength = this.mouseVelocity.length();
+                        if (mouseVelLength > maxMouseVel) {
+                            this.mouseVelocity.multiplyScalar(maxMouseVel / mouseVelLength);
+                        }
+                    }
+                }
+            }
+            
+            onMouseDown(event) {
+                // Skip if we're over a UI element
+                if (this.isOverUIElement(event)) return;
+                
+                // If in interaction mode, set mouse down state
+                if (this.interactionMode === 'interaction') {
+                    this.isMouseDown = true;
+                    this.onMouseMove(event); // Update mouse position
+                }
+            }
+            
+            onMouseUp() {
+                this.isMouseDown = false;
+            }
+            
+            // Helper function to check if mouse is over UI elements
+            isOverUIElement(event) {
+                const elements = [
+                    document.querySelector('.navbar'),
+                    document.querySelector('.info-panel'),
+                    document.querySelector('.settings-panel'),
+                    document.querySelector('.footer')
+                ];
+                
+                for (const element of elements) {
+                    if (element) {
+                        const rect = element.getBoundingClientRect();
+                        if (
+                            event.clientX >= rect.left && 
+                            event.clientX <= rect.right && 
+                            event.clientY >= rect.top && 
+                            event.clientY <= rect.bottom
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                
+                return false;
+            }
+        }
+
+        // Logo handling - this allows for easy logo updates across all instances
+        function updateLogo(logoUrl) {
+            const logoElements = document.querySelectorAll('.logo-img');
+            for (const logoEl of logoElements) {
+                logoEl.src = logoUrl;
+                if (logoUrl) {
+                    logoEl.style.display = 'block';
+                    logoEl.parentElement.querySelector('.logo-placeholder').style.display = 'none';
+                } else {
+                    logoEl.style.display = 'none';
+                    logoEl.parentElement.querySelector('.logo-placeholder').style.display = 'flex';
+                }
+            }
+            // Save to localStorage for persistence
+            if (logoUrl) localStorage.setItem('appLogo', logoUrl);
+        }
+
+        // Initialize from localStorage if available
+        const savedLogo = localStorage.getItem('appLogo');
+        if (savedLogo) {
+            updateLogo(savedLogo);
+        }
+
+        // Theme Toggle Functionality
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        // Check for saved theme preference or default to dark
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        
+        // Apply the theme
+        function applyTheme(theme) {
+            if (theme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                themeToggle.checked = true;
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                themeToggle.checked = false;
+            }
+            
+            // Dispatch theme change event
+            dispatchThemeChangeEvent(theme);
+        }
+        
+        // Initial theme application
+        applyTheme(savedTheme);
+        
+        // Theme toggle event listener
+        themeToggle.addEventListener('change', function() {
+            const newTheme = this.checked ? 'light' : 'dark';
+            applyTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+        
+        // Helper function to dispatch theme change event
+        function dispatchThemeChangeEvent(theme) {
+            const event = new CustomEvent('themeChange', {
+                detail: { theme: theme }
+            });
+            document.dispatchEvent(event);
+        }
+
+        // Loading simulation progress
+        function simulateLoading() {
+            const progressBar = document.getElementById('loading-progress-bar');
+            let progress = 0;
+            
+            const interval = setInterval(() => {
+                progress += 5;
+                progressBar.style.width = `${progress}%`;
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    document.getElementById('loading-screen').classList.add('fade-out');
+                    setTimeout(() => {
+                        document.getElementById('loading-screen').style.display = 'none';
+                    }, 500);
+                }
+            }, 50);
+        }
+        
+        // Start loading simulation
+        simulateLoading();
+        
+        // Start the simulation when the page loads
+        window.addEventListener('load', () => {
+            try {
+                window.sim = new ParticleSimulation();
+            } catch (error) {
+                console.error("Failed to start simulation:", error);
+                document.getElementById('status').textContent = "Failed to start: " + error.message;
+                
+                // Hide loading screen even on error
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
