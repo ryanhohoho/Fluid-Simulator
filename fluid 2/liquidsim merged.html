@@ -1410,18 +1410,18 @@
                 const boxGeometry = new THREE.BoxGeometry(size, size, size);
                 const boxEdges = new THREE.EdgesGeometry(boxGeometry);
                 const edgeMaterial = new THREE.LineBasicMaterial({ 
-                    color: 0x0070f3, // Vercel blue
-                    opacity: 0.8, 
+                    color: 0x000000, // Vercel blue
+                    opacity: 0, 
                     transparent: true,
-                    linewidth: 1.5
+                    linewidth: 0
                 });
                 const boxOutline = new THREE.LineSegments(boxEdges, edgeMaterial);
                 this.container.add(boxOutline);
                 
                 // Create semi-transparent sides
                 const panelMaterial = new THREE.MeshBasicMaterial({
-                    color: 0x0070f3,
-                    opacity: 0.1,
+                    color: 0x000000,
+                    opacity: 0,
                     transparent: true,
                     side: THREE.DoubleSide
                 });
@@ -1437,7 +1437,7 @@
                 
                 // Side panels (slightly visible)
                 const sidePanelMaterial = panelMaterial.clone();
-                sidePanelMaterial.opacity = 0.05;
+                sidePanelMaterial.opacity = 0;
                 
                 // Front panel (z+)
                 const frontPanel = new THREE.Mesh(
@@ -1474,19 +1474,6 @@
                 rightPanel.rotation.y = -Math.PI / 2;
                 this.container.add(rightPanel);
                 
-                // Ground plane for shadows
-                if (this.groundPlane) {
-                    this.scene.remove(this.groundPlane);
-                }
-                
-                this.groundPlane = new THREE.Mesh(
-                    new THREE.PlaneGeometry(100, 100),
-                    new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.9 })
-                );
-                this.groundPlane.rotation.x = -Math.PI / 2;
-                this.groundPlane.position.y = -halfSize - 0.01;
-                this.groundPlane.receiveShadow = true;
-                this.scene.add(this.groundPlane);
             }
             
             initParticles() {
