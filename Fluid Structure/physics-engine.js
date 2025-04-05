@@ -301,12 +301,19 @@ class PhysicsEngine {
     }
     
     handleObjectBoundaryCollisions(halfSize) {
+
         const { objects } = this.simulation.objectLoader;
         const { energyLoss, friction, speedLimit } = this.simulation.params;
         
         // handle object-boundary collisions
         for (const object of objects) {
-            if (object.physics.isFixed) continue; // skip fixed objects
+            // Skip light-related objects and fixed objects
+            if (object.physics.isFixed) continue;
+            
+            // Skip if this is a light component
+            if (object.mesh && object.mesh.userData && object.mesh.userData.isLightComponent) {
+                continue;
+            }
             
             // update bounding box
             object.physics.bbox.setFromObject(object.mesh);
@@ -420,6 +427,7 @@ class PhysicsEngine {
             // update mesh position
             object.mesh.position.copy(object.physics.position);
         }
+        
     }
     
     handleParticleObjectCollisions() {

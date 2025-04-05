@@ -28,6 +28,7 @@ if (savedLogo) {
 
 // theme toggle functionality
 const themeToggle = document.getElementById('theme-toggle');
+const themeToggleMini = document.getElementById('theme-toggle-mini');
 
 // check for saved theme preference or default to dark
 const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -36,10 +37,16 @@ const savedTheme = localStorage.getItem('theme') || 'dark';
 function applyTheme(theme) {
     if (theme === 'light') {
         document.documentElement.setAttribute('data-theme', 'light');
-        themeToggle.checked = true;
+        
+        // Update both theme toggles if they exist
+        if (themeToggle) themeToggle.checked = true;
+        if (themeToggleMini) themeToggleMini.checked = true;
     } else {
         document.documentElement.removeAttribute('data-theme');
-        themeToggle.checked = false;
+        
+        // Update both theme toggles if they exist
+        if (themeToggle) themeToggle.checked = false;
+        if (themeToggleMini) themeToggleMini.checked = false;
     }
     
     // dispatch theme change event
@@ -49,12 +56,22 @@ function applyTheme(theme) {
 // initial theme application
 applyTheme(savedTheme);
 
-// theme toggle event listener
-themeToggle.addEventListener('change', function() {
-    const newTheme = this.checked ? 'light' : 'dark';
-    applyTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-});
+// theme toggle event listeners
+if (themeToggle) {
+    themeToggle.addEventListener('change', function() {
+        const newTheme = this.checked ? 'light' : 'dark';
+        applyTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
+    });
+}
+
+if (themeToggleMini) {
+    themeToggleMini.addEventListener('change', function() {
+        const newTheme = this.checked ? 'light' : 'dark';
+        applyTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
+    });
+}
 
 // helper function to dispatch theme change event
 function dispatchThemeChangeEvent(theme) {

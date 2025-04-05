@@ -111,6 +111,9 @@ class ParticleSimulation {
         console.log("Resetting simulation");
         this.updateStatus("Resetting simulation...");
         
+        // Store the existing objects to preserve them
+        const existingObjects = [...this.objectLoader.objects];
+        
         // clear existing particles
         this.particleManager.clearParticles();
         
@@ -123,6 +126,45 @@ class ParticleSimulation {
         // recreate particles
         this.particleManager.createParticles();
         this.recreateParticlesNeeded = false;
+        
+        // Re-add objects to container
+        if (existingObjects.length > 0) {
+            // Clear current objects array but keep the meshes in the scene temporarily
+            this.objectLoader.objects = [];
+            
+            // Re-add each object properly
+            existingObjects.forEach(obj => {
+                // Update object scale and position if container size changed
+                if (obj.originalContainerSize && obj.originalContainerSize !== this.params.containerSize) {
+                    const scaleFactor = this.params.containerSize / obj.originalContainerSize;
+                    
+                    // Scale the position to maintain relative position in container
+                    obj.physics.position.x *= scaleFactor;
+                    obj.physics.position.y *= scaleFactor;
+                    obj.physics.position.z *= scaleFactor;
+                }
+                
+                // Update current container size reference
+                obj.originalContainerSize = this.params.containerSize;
+                
+                // Ensure object is visible and has correct materials
+                obj.mesh.visible = true;
+                
+                // Update mesh position 
+                obj.mesh.position.copy(obj.physics.position);
+                
+                // Re-add to the scene if not already there
+                if (!this.sceneManager.container.children.includes(obj.mesh)) {
+                    this.sceneManager.container.add(obj.mesh);
+                }
+                
+                // Force material update to ensure visibility
+                this.objectLoader.updateObjectMaterials(obj, document.getElementById('use-textures')?.checked ?? true);
+                
+                // Add to objects array
+                this.objectLoader.objects.push(obj);
+            });
+        }
         
         this.updateStatus("Simulation reset complete");
     }

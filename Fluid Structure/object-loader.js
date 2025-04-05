@@ -652,4 +652,61 @@ class ObjectLoader {
             object.physics.angularVelocity.multiplyScalar(0.98);
         }
     }
+
+    updateObjectMaterials(object, useTextures) {
+        if (!object || !object.mesh) return;
+        
+        // Force the mesh and all children to be visible
+        object.mesh.visible = true;
+        
+        object.mesh.traverse((node) => {
+            if (node instanceof THREE.Mesh) {
+                node.visible = true;
+                
+                if (useTextures) {
+                    // If the node already has a material with texture, keep it
+                    if (!node.material || !node.material.map) {
+                        // Otherwise create a default material if textures are enabled
+                        node.material = new THREE.MeshStandardMaterial({
+                            color: 0x1E88E5,
+                            metalness: 0.2,
+                            roughness: 0.5
+                        });
+                    }
+                } else {
+                    // Create a simple material if textures are disabled
+                    node.material = new THREE.MeshLambertMaterial({
+                        color: 0x1E88E5
+                    });
+                }
+                
+                // Make sure materials are updated and visible
+                if (node.material) {
+                    if (Array.isArray(node.material)) {
+                        node.material.forEach(mat => {
+                            if (mat) {
+                                mat.transparent = false;
+                                mat.opacity = 1.0;
+                                mat.needsUpdate = true;
+                            }
+                        });
+                    } else {
+                        node.material.transparent = false;
+                        node.material.opacity = 1.0;
+                        node.material.needsUpdate = true;
+                    }
+                }
+                
+                // Enable shadows
+                node.castShadow = true;
+                node.receiveShadow = true;
+            }
+        });
+        
+        // Force object matrix update
+        object.mesh.updateMatrix();
+        object.mesh.updateMatrixWorld(true);
+    }
+
+    
 }
