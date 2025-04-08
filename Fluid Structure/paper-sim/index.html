@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Paper Cutting Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 1;
+        }
+        
+        .ui-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            max-width: 300px;
+        }
+        
+        .ui-title {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .ui-instruction {
+            margin-bottom: 15px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .ui-control {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .ui-control label {
+            margin-right: 10px;
+            flex: 1;
+        }
+        
+        .ui-control input, .ui-control select {
+            flex: 1;
+        }
+        
+        .ui-button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+            transition: background 0.2s;
+        }
+        
+        .ui-button:hover {
+            background: #3367d6;
+        }
+        
+        .ui-button.reset {
+            background: #db4437;
+        }
+        
+        .ui-button.reset:hover {
+            background: #c31f0f;
+        }
+        
+        .mode-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .cutting-cursor {
+            position: fixed;
+            width: 32px;
+            height: 32px;
+            pointer-events: none;
+            z-index: 100;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>');
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="ui-container">
+        <div class="ui-title">Paper Cutting Simulation</div>
+        <div class="ui-instruction">
+            Press and hold SPACE to enter cutting mode, then drag across the paper to make cuts. Cut pieces will fall with realistic physics.
+        </div>
+        <div class="ui-control">
+            <label>Paper Stiffness:</label>
+            <input type="range" id="stiffness-slider" min="0.1" max="1.0" step="0.05" value="0.5">
+        </div>
+        <div class="ui-control">
+            <label>Air Resistance:</label>
+            <input type="range" id="air-resistance-slider" min="0.1" max="1.0" step="0.05" value="0.7">
+        </div>
+        <div class="ui-control">
+            <label>Paper Texture:</label>
+            <select id="paper-texture">
+                <option value="white">Plain White</option>
+                <option value="graph">Graph Paper</option>
+                <option value="parchment">Parchment</option>
+            </select>
+        </div>
+        <div class="ui-control">
+            <button class="ui-button" id="new-paper">New Paper</button>
+            <button class="ui-button reset" id="reset-scene">Reset Scene</button>
+        </div>
+    </div>
+
+    <div class="mode-indicator" id="mode-indicator">CAMERA MODE</div>
+    <div class="cutting-cursor" id="cutting-cursor"></div>
+
+    <!-- Third-party Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/ConvexHull.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/ConvexGeometry.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+
+    <!-- Our JavaScript modules -->
+    <script src="js/utils.js"></script>
+    <script src="js/orbit-controls.js"></script>
+    <script src="js/paper-physics.js"></script>
+    <script src="js/paper-mesh.js"></script>
+    <script src="js/cutting-system.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
