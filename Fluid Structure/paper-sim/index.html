@@ -37,11 +37,15 @@
             border-radius: 8px;
             color: white;
             max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: opacity 0.3s ease;
         }
         
         .ui-title {
             margin-bottom: 10px;
             font-size: 18px;
+            font-weight: bold;
+            text-align: center;
         }
         
         .ui-instruction {
@@ -63,6 +67,12 @@
         
         .ui-control input, .ui-control select {
             flex: 1;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            background: #333;
+            color: white;
+            cursor: pointer;
         }
         
         .ui-button {
@@ -73,11 +83,17 @@
             border-radius: 4px;
             cursor: pointer;
             margin-right: 5px;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.1s;
+            font-weight: bold;
         }
         
         .ui-button:hover {
             background: #3367d6;
+            transform: translateY(-1px);
+        }
+        
+        .ui-button:active {
+            transform: translateY(1px);
         }
         
         .ui-button.reset {
@@ -98,6 +114,8 @@
             border-radius: 20px;
             color: white;
             font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
         }
         
         .cutting-cursor {
@@ -111,6 +129,155 @@
             background-repeat: no-repeat;
             opacity: 0;
             transition: opacity 0.3s;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7));
+        }
+        
+        .help-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 50%;
+            color: white;
+            width: 40px;
+            height: 40px;
+            text-align: center;
+            line-height: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            font-size: 18px;
+        }
+        
+        .help-button:hover {
+            background: rgba(0, 0, 0, 0.9);
+            transform: scale(1.1);
+        }
+        
+        .help-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .help-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 80%;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .help-content h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .help-content p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+            color: #555;
+        }
+        
+        .help-content ul {
+            margin-bottom: 15px;
+            margin-left: 20px;
+        }
+        
+        .help-content li {
+            margin-bottom: 5px;
+        }
+        
+        .close-help {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        
+        .close-help:hover {
+            background: #3367d6;
+        }
+        
+        /* Loading indicator */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+        
+        .loader {
+            width: 80px;
+            height: 80px;
+            border: 8px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 8px solid #4285f4;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            position: absolute;
+            top: calc(50% + 50px);
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        /* Debug panel */
+        .debug-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            color: white;
+            max-width: 300px;
+            display: none;
+        }
+        
+        .debug-panel.visible {
+            display: block;
+        }
+        
+        .debug-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .debug-info {
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -136,6 +303,7 @@
                 <option value="white">Plain White</option>
                 <option value="graph">Graph Paper</option>
                 <option value="parchment">Parchment</option>
+                <option value="realistic" selected>Realistic Paper</option>
             </select>
         </div>
         <div class="ui-control">
@@ -146,6 +314,46 @@
 
     <div class="mode-indicator" id="mode-indicator">CAMERA MODE</div>
     <div class="cutting-cursor" id="cutting-cursor"></div>
+    <div class="help-button" id="help-button">?</div>
+    
+    <div class="help-modal" id="help-modal">
+        <div class="help-content">
+            <h2>Paper Cutting Simulation Help</h2>
+            <p>This interactive simulation allows you to cut virtual paper with realistic physics.</p>
+            
+            <h3>Controls:</h3>
+            <ul>
+                <li><strong>Mouse Drag</strong>: Rotate the camera (camera mode)</li>
+                <li><strong>Mouse Wheel</strong>: Zoom in/out</li>
+                <li><strong>SPACE + Mouse Drag</strong>: Cut paper (cutting mode)</li>
+                <li><strong>Ctrl+D</strong>: Toggle debug visualization</li>
+            </ul>
+            
+            <h3>Cutting Tips:</h3>
+            <ul>
+                <li>Cut from edge to edge for best results</li>
+                <li>Cut pieces will fall realistically</li>
+                <li>Adjust paper stiffness to change how paper bends</li>
+                <li>Adjust air resistance to change how paper falls</li>
+            </ul>
+            
+            <button class="close-help" id="close-help">Close</button>
+        </div>
+    </div>
+    
+    <!-- Loading screen -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="loader"></div>
+        <div class="loading-text">Loading Paper Simulation...</div>
+    </div>
+    
+    <!-- Debug panel -->
+    <div class="debug-panel" id="debug-panel">
+        <div class="debug-title">Debug Information</div>
+        <div class="debug-info" id="debug-info">
+            Initializing...
+        </div>
+    </div>
 
     <!-- Third-party Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -153,14 +361,63 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/ConvexHull.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/ConvexGeometry.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
-
-    <!-- Our JavaScript modules -->
+    
+    <!-- Utils -->
     <script src="js/utils.js"></script>
-    <script src="js/orbit-controls.js"></script>
+    <script src="js/debug-utils.js"></script>
+    
+    <!-- Our new implementation -->
     <script src="js/paper-physics.js"></script>
     <script src="js/paper-mesh.js"></script>
     <script src="js/cutting-system.js"></script>
     <script src="js/main.js"></script>
+    
+    <script>
+        // Add debug functionality
+        window.addEventListener('DOMContentLoaded', function() {
+            const debugPanel = document.getElementById('debug-panel');
+            const debugInfo = document.getElementById('debug-info');
+            
+            // Show debug panel when pressing Ctrl+F1
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'F1') {
+                    debugPanel.classList.toggle('visible');
+                }
+            });
+            
+            // Override console.log to show in debug panel
+            const originalLog = console.log;
+            console.log = function() {
+                // Call original console.log
+                originalLog.apply(console, arguments);
+                
+                // Add to debug info with timestamp
+                const time = new Date().toLocaleTimeString();
+                const message = Array.from(arguments).join(' ');
+                
+                if (debugInfo) {
+                    debugInfo.innerHTML = `[${time}] ${message}<br>` + debugInfo.innerHTML;
+                    
+                    // Limit to 20 lines
+                    const lines = debugInfo.innerHTML.split('<br>');
+                    if (lines.length > 20) {
+                        debugInfo.innerHTML = lines.slice(0, 20).join('<br>');
+                    }
+                }
+            };
+        });
+        
+        // Hide loading screen after simulation loads
+        window.addEventListener('load', function() {
+            // Simulate loading time for smoother UX
+            setTimeout(function() {
+                const loadingScreen = document.getElementById('loading-screen');
+                loadingScreen.style.opacity = '0';
+                setTimeout(function() {
+                    loadingScreen.style.display = 'none';
+                }, 500);
+            }, 1500);
+        });
+    </script>
 </body>
 </html>

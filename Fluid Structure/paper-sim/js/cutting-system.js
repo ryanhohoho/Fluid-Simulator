@@ -1,6 +1,5 @@
 /**
- * cutting-system.js
- * handles the improved paper cutting functionality with visual feedback
+ * cutting-system.js * handles the improved paper cutting functionality with visual feedback
  */
 
 class CuttingSystem {
@@ -33,7 +32,7 @@ class CuttingSystem {
     this.createCutVisualizer();
   }
   
-  // create visual elements for cutting
+  // create visual elements for cutting 
   createCutVisualizer() {
     // create cut line material (actual cut)
     const cutMaterial = new THREE.LineDashedMaterial({ 
@@ -927,6 +926,94 @@ class CuttingSystem {
         // Make scissor icon face camera
         this.scissorIcon.material.rotation = 0;
       }
+lueAtTime(220, audioContext.currentTime);
+    oscillator.frequency.linearRampToValueAtTime(440, audioContext.currentTime + 0.1);
+    
+    // create gain node for volume control
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+    
+    // connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // start and stop oscillator
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.2);
+  }
+  
+  // update method called each frame
+  update() {
+    // update cutting line if needed
+    if (this.isCutting) {
+      // could add animation or effects here
+ueAtTime(220, audioContext.currentTime);
+    oscillator.frequency.linearRampToValueAtTime(440, audioContext.currentTime + 0.1);
+    
+    // create gain node for volume control
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+    
+    // connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // start and stop oscillator
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.2);
+  }
+  
+  // update method called each frame
+  update() {
+    // update cutting line if needed
+    if (this.isCutting) {
+      // could add animation or effects here
+ueAtTime(220, audioContext.currentTime);
+    oscillator.frequency.linearRampToValueAtTime(440, audioContext.currentTime + 0.1);
+    
+    // create gain node for volume control
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+    
+    // connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // start and stop oscillator
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.2);
+  }
+  
+  // update method called each frame
+  update() {
+    // update cutting line if needed
+    if (this.isCutting) {
+      // could add animation or effects here
+lueAtTime(220, audioContext.currentTime);
+    oscillator.frequency.linearRampToValueAtTime(440, audioContext.currentTime + 0.1);
+    
+    // create gain node for volume control
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+    
+    // connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // start and stop oscillator
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.2);
+  }
+  
+  // update method called each frame
+  update() {
+    // update cutting line if needed
+    if (this.isCutting) {
+      // could add animation or effects here
     }
   }
 }
