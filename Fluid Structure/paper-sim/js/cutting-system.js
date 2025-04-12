@@ -1,6 +1,6 @@
 /**
  * cutting-system.js
- * handles the paper cutting functionality
+ * handles the improved paper cutting functionality with visual feedback
  */
 
 class CuttingSystem {
@@ -14,39 +14,87 @@ class CuttingSystem {
     // cutting state
     this.isCutting = false;
     this.cutPoints = [];
+    this.cutStartPoint = null;
+    this.cutEndPoint = null;
+    this.cutStartEdge = false;
+    this.cutEndEdge = false;
+    
+    // visual elements
     this.cutLine = null;
+    this.cutPlane = null;
+    this.scissorLine = null;
+    this.scissorIcon = null;
     
     // raycaster for intersection detection
     this.raycaster = new THREE.Raycaster();
     this.raycaster.params.Line = { threshold: 0.2 };
     
-    // visual elements
+    // create visual elements for cutting
     this.createCutVisualizer();
   }
   
   // create visual elements for cutting
   createCutVisualizer() {
-    // create cut line material
-    const material = new THREE.LineBasicMaterial({ 
+    // create cut line material (actual cut)
+    const cutMaterial = new THREE.LineDashedMaterial({ 
       color: 0xff0000,
       linewidth: 2,
+      scale: 1,
+      dashSize: 0.5,
+      gapSize: 0.25,
       opacity: 0.7,
       transparent: true
     });
     
-    // create empty geometry
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+    // create empty geometry for cut line
+    const cutGeometry = new THREE.BufferGeometry();
+    cutGeometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
     
     // create line
-    this.cutLine = new THREE.Line(geometry, material);
+    this.cutLine = new THREE.Line(cutGeometry, cutMaterial);
+    this.cutLine.computeLineDistances(); // needed for dashed lines
+    this.cutLine.visible = false;
     this.scene.add(this.cutLine);
+    
+    // create scissor line material (preview)
+    const scissorMaterial = new THREE.LineDashedMaterial({ 
+      color: 0x000000,
+      linewidth: 2,
+      scale: 1,
+      dashSize: 0.5,
+      gapSize: 0.25,
+      opacity: 0.8,
+      transparent: true
+    });
+    
+    // create empty geometry for scissor line
+    const scissorGeometry = new THREE.BufferGeometry();
+    scissorGeometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+    
+    // create scissor line
+    this.scissorLine = new THREE.Line(scissorGeometry, scissorMaterial);
+    this.scissorLine.computeLineDistances(); // needed for dashed lines
+    this.scissorLine.visible = false;
+    this.scene.add(this.scissorLine);
+    
+    // create scissor icon (sprite)
+    const scissorTexture = this.createScissorTexture();
+    const scissorMat = new THREE.SpriteMaterial({ 
+      map: scissorTexture,
+      transparent: true,
+      opacity: 0.9
+    });
+    
+    this.scissorIcon = new THREE.Sprite(scissorMat);
+    this.scissorIcon.scale.set(2, 2, 1);
+    this.scissorIcon.visible = false;
+    this.scene.add(this.scissorIcon);
     
     // create cut visualization plane
     const planeGeometry = new THREE.PlaneGeometry(1, 1);
     const planeMaterial = new THREE.MeshBasicMaterial({
       color: 0xff0000,
-      opacity: 0.2,
+      opacity: 0.15,
       transparent: true,
       side: THREE.DoubleSide
     });
@@ -54,6 +102,56 @@ class CuttingSystem {
     this.cutPlane = new THREE.Mesh(planeGeometry, planeMaterial);
     this.cutPlane.visible = false;
     this.scene.add(this.cutPlane);
+  }
+  
+  // create a texture for the scissor icon
+  createScissorTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    // clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // draw scissors icon
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.fillStyle = '#ffffff';
+    
+    // handle
+    ctx.beginPath();
+    ctx.ellipse(20, 44, 8, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.ellipse(44, 44, 8, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
+    // blades
+    ctx.beginPath();
+    ctx.moveTo(20, 30);
+    ctx.quadraticCurveTo(32, 25, 32, 10);
+    ctx.lineTo(28, 10);
+    ctx.quadraticCurveTo(28, 22, 20, 26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(44, 30);
+    ctx.quadraticCurveTo(32, 25, 32, 10);
+    ctx.lineTo(36, 10);
+    ctx.quadraticCurveTo(36, 22, 44, 26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    // create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
   }
   
   // start cutting with first point
@@ -76,12 +174,16 @@ class CuttingSystem {
     
     if (intersects.length > 0) {
       this.isCutting = true;
-      this.cutPoints = [intersects[0].point.clone()];
+      this.cutStartPoint = intersects[0].point.clone();
+      this.cutPoints = [this.cutStartPoint];
       
-      // update cut line visualization
-      this.updateCutLine();
+      // check if this point is near an edge (for edge-to-edge cutting)
+      this.cutStartEdge = this.isNearEdge(intersects[0].point, this.paperMesh.mesh);
       
-      console.log("Started cutting at", this.cutPoints[0]);
+      // update scissor line visualization
+      this.updateScissorLine(this.cutStartPoint, this.cutStartPoint);
+      
+      console.log("Started cutting at", this.cutStartPoint, "Near edge:", this.cutStartEdge);
     }
   }
   
@@ -104,63 +206,175 @@ class CuttingSystem {
     const intersects = this.raycaster.intersectObject(this.paperMesh.mesh);
     
     if (intersects.length > 0) {
-      // check if point is different enough from last point
-      const lastPoint = this.cutPoints[this.cutPoints.length - 1];
-      const newPoint = intersects[0].point.clone();
+      // get current cut point
+      const currentPoint = intersects[0].point.clone();
+      this.cutEndPoint = currentPoint;
       
-      if (newPoint.distanceTo(lastPoint) > 0.2) {
-        this.cutPoints.push(newPoint);
+      // check if near edge
+      this.cutEndEdge = this.isNearEdge(currentPoint, this.paperMesh.mesh);
+      
+      // update the preview line
+      this.updateScissorLine(this.cutStartPoint, currentPoint);
+      
+      // can add points more frequently for detailed curves if needed
+      if (this.cutPoints.length > 0) {
+        const lastPoint = this.cutPoints[this.cutPoints.length - 1];
         
-        // update cut line visualization
-        this.updateCutLine();
+        // add new point if it's far enough from the last one
+        if (currentPoint.distanceTo(lastPoint) > 0.5) {
+          this.cutPoints.push(currentPoint.clone());
+        }
       }
+      
+      // update cut plane preview based on start and current point
+      this.updateCutPlanePreview(this.cutStartPoint, currentPoint);
     }
+  }
+  
+  // check if a point is near the edge of the paper mesh
+  isNearEdge(point, mesh) {
+    // get mesh dimensions
+    const geometry = mesh.geometry;
+    geometry.computeBoundingBox();
+    const boundingBox = geometry.boundingBox;
+    
+    // transform point to local space
+    const localPoint = point.clone().applyMatrix4(mesh.matrixWorld.clone().invert());
+    
+    // get mesh width and height
+    const width = boundingBox.max.x - boundingBox.min.x;
+    const height = boundingBox.max.y - boundingBox.min.y;
+    
+    // calculate distance to each edge
+    const distToLeft = Math.abs(localPoint.x - boundingBox.min.x);
+    const distToRight = Math.abs(localPoint.x - boundingBox.max.x);
+    const distToTop = Math.abs(localPoint.y - boundingBox.max.y);
+    const distToBottom = Math.abs(localPoint.y - boundingBox.min.y);
+    
+    // threshold for "near edge" (as a percentage of dimension)
+    const threshold = Math.min(width, height) * 0.1;
+    
+    return (distToLeft < threshold || 
+            distToRight < threshold || 
+            distToTop < threshold || 
+            distToBottom < threshold);
+  }
+  
+  // update the preview scissor line
+  updateScissorLine(startPoint, endPoint) {
+    if (!this.scissorLine || !this.scissorIcon) return;
+    
+    // create line geometry
+    const positions = [
+      startPoint.x, startPoint.y, startPoint.z,
+      endPoint.x, endPoint.y, endPoint.z
+    ];
+    
+    // update line geometry
+    this.scissorLine.geometry.dispose();
+    this.scissorLine.geometry = new THREE.BufferGeometry();
+    this.scissorLine.geometry.setAttribute(
+      'position', 
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
+    
+    // compute line distances for dashed lines
+    this.scissorLine.computeLineDistances();
+    
+    // position scissor icon near the end point
+    const direction = new THREE.Vector3().subVectors(endPoint, startPoint).normalize();
+    const iconPosition = endPoint.clone().addScaledVector(direction, -0.5);
+    this.scissorIcon.position.copy(iconPosition);
+    
+    // make scissor icon face the camera
+    this.scissorIcon.position.copy(iconPosition);
+    
+    // show line and icon
+    this.scissorLine.visible = true;
+    this.scissorIcon.visible = true;
+  }
+  
+  // update cut plane preview
+  updateCutPlanePreview(startPoint, endPoint) {
+    if (!this.cutPlane || !this.paperMesh.mesh) return;
+    
+    // get normal of paper (assuming Z axis in local space)
+    const paperNormal = new THREE.Vector3(0, 0, 1);
+    paperNormal.applyQuaternion(this.paperMesh.mesh.quaternion);
+    
+    // get direction of cut line
+    const cutDirection = new THREE.Vector3().subVectors(endPoint, startPoint).normalize();
+    
+    // calculate plane normal (perpendicular to both paper normal and cut direction)
+    const planeNormal = new THREE.Vector3().crossVectors(cutDirection, paperNormal).normalize();
+    
+    // calculate center point of cut line
+    const centerPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
+    
+    // get dimensions of paper
+    const geometry = this.paperMesh.mesh.geometry;
+    const width = geometry.parameters.width * 1.2; // slightly larger than paper
+    const height = geometry.parameters.height * 1.2;
+    
+    // update cut plane geometry
+    this.cutPlane.geometry.dispose();
+    this.cutPlane.geometry = new THREE.PlaneGeometry(width, height);
+    
+    // align with normal direction
+    this.cutPlane.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      planeNormal
+    );
+    
+    // position the plane at the center of the cut line
+    this.cutPlane.position.copy(centerPoint);
+    
+    // calculate color based on cut validity
+    if (this.cutStartEdge && this.cutEndEdge) {
+      // valid cut - green tint
+      this.cutPlane.material.color.set(0x00ff00);
+    } else {
+      // invalid cut - red tint
+      this.cutPlane.material.color.set(0xff0000);
+    }
+    
+    // show plane
+    this.cutPlane.visible = true;
   }
   
   // end cutting and perform cut
   endCutting() {
     if (!this.isCutting) return;
     
-    // need at least 2 points for a cut
-    if (this.cutPoints.length >= 2) {
+    // check if we have valid start and end points and at least one is near an edge
+    if (this.cutStartPoint && this.cutEndPoint && 
+        (this.cutStartEdge && this.cutEndEdge) && 
+        this.cutStartPoint.distanceTo(this.cutEndPoint) > 1.0) {
+      
       // perform the cut
       this.performCut();
+    } else {
+      console.log("Invalid cut: both ends must be near edges and line must be long enough");
     }
     
     // reset cutting state
     this.isCutting = false;
     this.cutPoints = [];
+    this.cutStartPoint = null;
+    this.cutEndPoint = null;
+    this.cutStartEdge = false;
+    this.cutEndEdge = false;
     
-    // clear cut line visualization
-    this.updateCutLine();
+    // hide visual elements
+    this.hideVisualElements();
   }
   
-  // update cut line visualization
-  updateCutLine() {
-    if (!this.cutLine) return;
-    
-    // if no points or not cutting, hide line
-    if (this.cutPoints.length === 0 || !this.isCutting) {
-      this.cutLine.visible = false;
-      return;
-    }
-    
-    // extract positions for line geometry
-    const positions = [];
-    for (const point of this.cutPoints) {
-      positions.push(point.x, point.y, point.z);
-    }
-    
-    // update line geometry
-    this.cutLine.geometry.dispose();
-    this.cutLine.geometry = new THREE.BufferGeometry();
-    this.cutLine.geometry.setAttribute(
-      'position', 
-      new THREE.Float32BufferAttribute(positions, 3)
-    );
-    
-    // show line
-    this.cutLine.visible = true;
+  // hide all visual elements
+  hideVisualElements() {
+    if (this.cutLine) this.cutLine.visible = false;
+    if (this.cutPlane) this.cutPlane.visible = false;
+    if (this.scissorLine) this.scissorLine.visible = false;
+    if (this.scissorIcon) this.scissorIcon.visible = false;
   }
   
   // perform the cut operation
@@ -232,143 +446,28 @@ class CuttingSystem {
   
   // create a plane from the cut points
   createCutPlane() {
-    if (this.cutPoints.length < 3) {
-      // for straight cuts (2 points), create a plane perpendicular to paper
-      if (this.cutPoints.length === 2) {
-        const start = this.cutPoints[0];
-        const end = this.cutPoints[1];
-        
-        // paper normal (assuming z is normal to paper)
-        const paperNormal = new THREE.Vector3(0, 0, 1);
-        paperNormal.applyQuaternion(this.paperMesh.mesh.quaternion);
-        
-        // direction of cut
-        const cutDirection = new THREE.Vector3().subVectors(end, start).normalize();
-        
-        // plane normal (perpendicular to both paper normal and cut direction)
-        const planeNormal = new THREE.Vector3().crossVectors(cutDirection, paperNormal).normalize();
-        
-        // calculate plane constant (d in ax + by + cz + d = 0)
-        const planeConstant = -planeNormal.dot(start);
-        
-        // visualize cut plane
-        this.visualizeCutPlane(planeNormal, planeConstant);
-        
-        return { normal: planeNormal, constant: planeConstant };
-      }
-      
+    if (!this.cutStartPoint || !this.cutEndPoint) {
       return null;
     }
     
-    // for curved cuts (more than 2 points), fit a plane to the points
-    // using least squares method
+    // for straight cuts, create a plane perpendicular to paper
+    const start = this.cutStartPoint;
+    const end = this.cutEndPoint;
     
-    // first, calculate the centroid of the points
-    const centroid = new THREE.Vector3();
-    for (const point of this.cutPoints) {
-      centroid.add(point);
-    }
-    centroid.divideScalar(this.cutPoints.length);
+    // paper normal (assuming z is normal to paper)
+    const paperNormal = new THREE.Vector3(0, 0, 1);
+    paperNormal.applyQuaternion(this.paperMesh.mesh.quaternion);
     
-    // build the covariance matrix
-    let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
+    // direction of cut
+    const cutDirection = new THREE.Vector3().subVectors(end, start).normalize();
     
-    for (const point of this.cutPoints) {
-      const dx = point.x - centroid.x;
-      const dy = point.y - centroid.y;
-      const dz = point.z - centroid.z;
-      
-      xx += dx * dx;
-      xy += dx * dy;
-      xz += dx * dz;
-      yy += dy * dy;
-      yz += dy * dz;
-      zz += dz * dz;
-    }
-    
-    // create the covariance matrix
-    const covMatrix = [
-      [xx, xy, xz],
-      [xy, yy, yz],
-      [xz, yz, zz]
-    ];
-    
-    // find the eigenvector with the smallest eigenvalue
-    // (this is a simplified approach - for real applications, use a linear algebra library)
-    const planeNormal = this.findSmallestEigenvector(covMatrix);
+    // plane normal (perpendicular to both paper normal and cut direction)
+    const planeNormal = new THREE.Vector3().crossVectors(cutDirection, paperNormal).normalize();
     
     // calculate plane constant (d in ax + by + cz + d = 0)
-    const planeConstant = -planeNormal.dot(centroid);
-    
-    // visualize cut plane
-    this.visualizeCutPlane(planeNormal, planeConstant);
+    const planeConstant = -planeNormal.dot(start);
     
     return { normal: planeNormal, constant: planeConstant };
-  }
-  
-  // visualize the cut plane (for debugging)
-  visualizeCutPlane(normal, constant) {
-    if (!this.cutPlane) return;
-    
-    // make a large square plane
-    const size = 50;
-    this.cutPlane.geometry.dispose();
-    this.cutPlane.geometry = new THREE.PlaneGeometry(size, size);
-    
-    // align with normal direction
-    this.cutPlane.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      normal
-    );
-    
-    // position the plane at the correct distance from origin
-    const dist = -constant;
-    this.cutPlane.position.copy(normal.clone().multiplyScalar(dist));
-    
-    // show briefly, then hide
-    this.cutPlane.visible = true;
-    setTimeout(() => {
-      this.cutPlane.visible = false;
-    }, 500);
-  }
-  
-  // find eigenvector with smallest eigenvalue (simplified)
-  findSmallestEigenvector(matrix) {
-    // this is a simplified approach - for real applications, use a linear algebra library
-    // we use the power iteration method to find eigenvector with smallest eigenvalue
-    
-    // create a 3D identity matrix
-    const identity = [
-      [1, 0, 0],
-      [0, 1, 0],
-      [0, 0, 1]
-    ];
-    
-    // find the trace (sum of diagonal elements)
-    const trace = matrix[0][0] + matrix[1][1] + matrix[2][2];
-    
-    // create B = trace(A)I - A (to convert max eigenvalue problem to min eigenvalue)
-    const B = [
-      [trace - matrix[0][0], -matrix[0][1], -matrix[0][2]],
-      [-matrix[1][0], trace - matrix[1][1], -matrix[1][2]],
-      [-matrix[2][0], -matrix[2][1], trace - matrix[2][2]]
-    ];
-    
-    // start with a random vector
-    let v = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
-    
-    // power iteration (5 iterations should be enough for our purpose)
-    for (let i = 0; i < 5; i++) {
-      // multiply B * v
-      const x = B[0][0] * v.x + B[0][1] * v.y + B[0][2] * v.z;
-      const y = B[1][0] * v.x + B[1][1] * v.y + B[1][2] * v.z;
-      const z = B[2][0] * v.x + B[2][1] * v.y + B[2][2] * v.z;
-      
-      // update v and normalize
-      v.set(x, y, z).normalize();
-    }
-    
-    return v;
   }
   
   // split a mesh by a plane
@@ -650,7 +749,7 @@ class CuttingSystem {
       belowMesh = belowGeometry;
     }
     
-    // if either part is empty, return a small triangle to avoid errors
+    // if either part is empty, create a small triangle to avoid errors
     if (!aboveMesh) {
       // create a small triangle above the plane
       const smallGeo = new THREE.BufferGeometry();
@@ -729,7 +828,10 @@ class CuttingSystem {
     
     let containsTopCorner = false;
     
-    for (let i = 0; i < positions.count; i++) {
+    // check a sample of vertices
+    const checkFrequency = Math.max(1, Math.floor(positions.count / 100)); // Don't check every vertex for large meshes
+    
+    for (let i = 0; i < positions.count; i += checkFrequency) {
       const point = new THREE.Vector3().fromBufferAttribute(positions, i);
       
       // check distance to top left corner
@@ -750,33 +852,81 @@ class CuttingSystem {
   
   // play a cutting sound effect
   playCuttingSound() {
+    // create audio context
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
-    // create oscillator for cutting sound
-    const oscillator = audioContext.createOscillator();
-    oscillator.type = 'sawtooth';
-    oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
-    oscillator.frequency.linearRampToValueAtTime(440, audioContext.currentTime + 0.1);
+    // create oscillator for scissor sound (two frequencies for scissors opening/closing)
+    const oscillator1 = audioContext.createOscillator();
+    oscillator1.type = 'sawtooth';
+    oscillator1.frequency.setValueAtTime(220, audioContext.currentTime);
+    oscillator1.frequency.linearRampToValueAtTime(440, audioContext.currentTime + 0.1);
+    
+    const oscillator2 = audioContext.createOscillator();
+    oscillator2.type = 'sawtooth';
+    oscillator2.frequency.setValueAtTime(330, audioContext.currentTime);
+    oscillator2.frequency.linearRampToValueAtTime(660, audioContext.currentTime + 0.15);
+    
+    // create filter for more realistic sound
+    const filter = audioContext.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 800;
+    filter.Q.value = 3;
     
     // create gain node for volume control
     const gainNode = audioContext.createGain();
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+    gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
     
     // connect nodes
-    oscillator.connect(gainNode);
+    oscillator1.connect(filter);
+    oscillator2.connect(filter);
+    filter.connect(gainNode);
     gainNode.connect(audioContext.destination);
     
-    // start and stop oscillator
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.2);
+    // add a bit of noise for more realistic scissor sound
+    const bufferSize = 2 * audioContext.sampleRate;
+    const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+    
+    const noise = audioContext.createBufferSource();
+    noise.buffer = noiseBuffer;
+    
+    const noiseFilter = audioContext.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.value = 5000;
+    
+    const noiseGain = audioContext.createGain();
+    noiseGain.gain.setValueAtTime(0.05, audioContext.currentTime);
+    noiseGain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+    
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(audioContext.destination);
+    
+    // start sound
+    oscillator1.start();
+    oscillator2.start();
+    noise.start();
+    
+    // stop after a short time
+    oscillator1.stop(audioContext.currentTime + 0.3);
+    oscillator2.stop(audioContext.currentTime + 0.3);
+    noise.stop(audioContext.currentTime + 0.3);
   }
   
   // update method called each frame
   update() {
-    // update cutting line if needed
+    // update cutting visualization if needed
     if (this.isCutting) {
-      // could add animation or effects here
+      // Update the scissor icon rotation to face the camera
+      if (this.scissorIcon && this.scissorIcon.visible) {
+        // Make scissor icon face camera
+        this.scissorIcon.material.rotation = 0;
+      }
     }
   }
 }

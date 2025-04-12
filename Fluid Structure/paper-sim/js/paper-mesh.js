@@ -1,6 +1,6 @@
 /**
  * paper-mesh.js
- * handles the creation and management of the paper's geometry
+ * handles the creation and management of the bendable paper's geometry
  */
 
 class PaperMesh {
@@ -118,7 +118,7 @@ class PaperMesh {
     return texture;
   }
   
-  // create the paper mesh
+  // create the paper mesh with increased subdivision for better bending
   createPaper() {
     // remove existing paper if any
     if (this.mesh) {
@@ -127,12 +127,15 @@ class PaperMesh {
       this.mesh.material.dispose();
     }
     
-    // create a subdivided plane geometry
+    // increase subdivisions for bendable paper
+    const subdivisions = this.params.subdivisions;
+    
+    // create a subdivided plane geometry for bendable paper
     const geometry = new THREE.PlaneGeometry(
       this.width, 
       this.height, 
-      this.params.subdivisions, 
-      this.params.subdivisions
+      subdivisions, 
+      subdivisions
     );
     
     // create material based on current texture selection
@@ -151,13 +154,13 @@ class PaperMesh {
     // add to scene
     this.scene.add(this.mesh);
     
-    // create physics representation
+    // create physics representation with mass-spring system
     this.physicsSystem.initializeMainPaper(this.mesh);
     
     // add front and back faces (for thickness visualization)
     this.addPaperThickness();
     
-    console.log("Created paper with", this.params.subdivisions, "subdivisions");
+    console.log("Created paper with", subdivisions, "subdivisions");
   }
   
   // create material for paper based on texture selection
@@ -175,6 +178,8 @@ class PaperMesh {
       map: textureSet.diffuse,
       normalMap: textureSet.normal,
       roughnessMap: textureSet.roughness,
+      // properties for bendable appearance
+      flatShading: false, // smooth shading for better bending appearance
     });
     
     return material;
@@ -268,6 +273,21 @@ class PaperMesh {
   
   // update method called each frame
   update() {
-    // update any animations or procedural behaviors here
+    // Adjust the thickness edges to match the deformed paper
+    this.updateThicknessEdges();
+  }
+  
+  // update thickness edges to follow paper deformation
+  updateThicknessEdges() {
+    if (!this.mesh || !this.edgeMesh) return;
+    
+    // For proper edge visualization, would need to continuously update the edge mesh
+    // based on the deformed vertices of the paper
+    // This is computationally expensive, so consider only updating it occasionally
+    
+    // Reset edge mesh visibility when paper is deformed
+    if (this.mesh.geometry.attributes.position.needsUpdate) {
+      this.edgeMesh.visible = false;
+    }
   }
 }

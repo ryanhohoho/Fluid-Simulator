@@ -1,6 +1,6 @@
 /**
  * main.js
- * main entry point for the paper cutting simulation
+ * main entry point for the improved paper cutting simulation with bendable paper
  */
 
 // global objects
@@ -8,13 +8,14 @@ let scene, camera, renderer, controls;
 let paper, cuttingSystem, physicsSystem;
 let interactionMode = 'camera'; // 'camera' or 'cutting'
 let lastTime = 0;
+let elapsedTime = 0;
 
 // simulation parameters
 const params = {
   paperWidth: 30,
   paperHeight: 40,
   paperThickness: 0.05,
-  subdivisions: 40, // higher = better cutting resolution but slower
+  subdivisions: 40, // higher = better cutting resolution and bending quality
   stiffness: 0.5,
   airResistance: 0.7,
   gravity: 9.8,
@@ -23,7 +24,7 @@ const params = {
 
 // initialization
 function init() {
-  console.log('Initializing paper cutting simulation...');
+  console.log('Initializing paper cutting simulation with bendable paper...');
   
   // create scene
   scene = new THREE.Scene();
@@ -68,6 +69,11 @@ function init() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   
+  // enable depth buffer
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  
   // setup orbit controls using our extended version
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -88,6 +94,9 @@ function init() {
   // initial paper creation
   paper.createPaper();
   
+  // update UI
+  updateUIElements();
+  
   // start animation loop
   animate();
   
@@ -101,12 +110,13 @@ function animate(time) {
   // compute delta time in seconds
   const deltaTime = time ? (time - lastTime) / 1000 : 1/60;
   lastTime = time;
+  elapsedTime += deltaTime;
   
   // limit delta time to avoid large jumps
   const limitedDelta = Math.min(deltaTime, 1/30);
   
   // update physics
-  physicsSystem.update(limitedDelta);
+  physicsSystem.update(limitedDelta, elapsedTime);
   
   // update cutting system
   cuttingSystem.update();
@@ -179,16 +189,19 @@ function setupEventListeners() {
   document.getElementById('stiffness-slider').addEventListener('input', (event) => {
     params.stiffness = parseFloat(event.target.value);
     physicsSystem.updateParameters(params);
+    updateUIElements();
   });
   
   document.getElementById('air-resistance-slider').addEventListener('input', (event) => {
     params.airResistance = parseFloat(event.target.value);
     physicsSystem.updateParameters(params);
+    updateUIElements();
   });
   
   document.getElementById('paper-texture').addEventListener('change', (event) => {
     params.paperTexture = event.target.value;
     paper.updateTexture(params.paperTexture);
+    updateUIElements();
   });
   
   document.getElementById('new-paper').addEventListener('click', () => {
@@ -201,6 +214,16 @@ function setupEventListeners() {
     // create new paper
     paper.createPaper();
   });
+}
+
+// update UI elements to reflect current parameters
+function updateUIElements() {
+  // update sliders
+  document.getElementById('stiffness-slider').value = params.stiffness;
+  document.getElementById('air-resistance-slider').value = params.airResistance;
+  
+  // update dropdown
+  document.getElementById('paper-texture').value = params.paperTexture;
 }
 
 // toggle cutting mode
